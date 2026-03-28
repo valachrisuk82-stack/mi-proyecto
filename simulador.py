@@ -1,0 +1,15 @@
+par = input("Par de divisas (ej: EURUSD): ")
+entrada = float(input("Precio de entrada: "))
+stop_loss = float(input("Stop Loss: "))
+take_profit = float(input("Take Profit: "))
+lotes = float(input("Tamaño del lote: "))
+
+pips_riesgo = round(abs(entrada - stop_loss) * 10000, 1)
+pips_ganancia = round(abs(take_profit - entrada) * 10000, 1)
+perdida = round(pips_riesgo * 10 * lotes, 2)
+ganancia = round(pips_ganancia * 10 * lotes,2)
+
+print(f"\nPar: {par}")
+print(f"Riesgo: {pips_riesgo} pips = -${perdida}")
+print(f"Objetivo: {pips_ganancia} pips = +${ganancia}")
+print(f"Ratio riesgo/beneficio: 1:{round(pips_ganancia/pips_riesgo, 2)}")
