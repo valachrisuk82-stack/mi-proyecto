@@ -1,15 +1,20 @@
-par = input("Par de divisas (ej: EURUSD): ")
+par = input("Par de divisas (ej:EURUSD): ")
+direccion = input("Direccion (compra/venta): ").lower()
 entrada = float(input("Precio de entrada: "))
-stop_loss = float(input("Stop Loss: "))
-take_profit = float(input("Take Profit: "))
-lotes = float(input("Tamaño del lote: "))
-
-pips_riesgo = round(abs(entrada - stop_loss) * 10000, 1)
-pips_ganancia = round(abs(take_profit - entrada) * 10000, 1)
-perdida = round(pips_riesgo * 10 * lotes, 2)
-ganancia = round(pips_ganancia * 10 * lotes,2)
-
-print(f"\nPar: {par}")
-print(f"Riesgo: {pips_riesgo} pips = -${perdida}")
-print(f"Objetivo: {pips_ganancia} pips = +${ganancia}")
-print(f"Ratio riesgo/beneficio: 1:{round(pips_ganancia/pips_riesgo, 2)}")
+saldo = float(input("Saldo de tu cuenta ($): "))
+pips_sl = float(input("Pips de Stop Loss: "))
+pip = 0.0001
+pips_tp = pips_sl * 2
+riesgo_dinero = saldo * 0.02
+if direccion == "compra":
+    sl = round(entrada - pips_sl * pip, 5)
+    tp = round(entrada + pips_tp * pip, 5)
+else:
+    sl = round(entrada + pips_sl * pip, 5)
+    tp = round(entrada - pips_tp * pip, 5)
+valor_pip = 10
+lote = round(riesgo_dinero / (pips_sl * valor_pip), 2)
+print(f"VALORES PARA MT5")
+print(f"Stop Loss: {sl}")
+print(f"Take Profit: {tp}")
+print(f"Lote sugerido: {lote}")
