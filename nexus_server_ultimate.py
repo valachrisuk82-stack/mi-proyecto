@@ -26,7 +26,7 @@ from datetime import datetime
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
-    "anthropic_api_key": "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",
+    "anthropic_api_key": "TU_API_KEY_AQUI",
 
     # Telegram — pon tu token y chat_id
     "telegram_token":  "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
