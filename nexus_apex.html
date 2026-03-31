@@ -597,6 +597,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setInterval(checkServer, 8000);
   setInterval(fetchTickers, 7000);
   setInterval(() => fetchCandles(S.pair, S.tf), 25000);
+  setInterval(() => runMTF(), 30000);
   window.addEventListener("resize", () => drawCandles(S.candles));
   document.getElementById("pairCnt");
   selectPair("BTCUSDT");
@@ -1014,7 +1015,7 @@ function localAI(pair){
   if(hist>0)score+=1;else score-=1;
   if(ema9>ema21)score+=1;else score-=1;
   patterns.forEach(p=>{if(p.type==="bull")score+=1;else if(p.type==="bear")score-=1;});
-  const sig=score>=3?"BUY":score<=-3?"SELL":"WAIT";
+  const sig=score>=2?"BUY":score<=-2?"SELL":"WAIT";
   const sl=sig==="BUY"?price-atr*1.5:price+atr*1.5;
   const tp=sig==="BUY"?price+atr*3:price-atr*3;
   const trail=sig==="BUY"?price-atr*2:price+atr*2;
