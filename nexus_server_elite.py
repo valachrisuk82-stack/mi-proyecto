@@ -48,7 +48,7 @@ PAIRS = [
     "MANAUSDT","AAVEUSDT","SHIBUSDT","TRXUSDT",
 ]
 
-BASE = "https://api.binance.com/api/v3"
+BASE = "https://api1.binance.com/api/v3"
 
 # ══════════════════════════════════════════════════════════════════
 #  TELEGRAM
