@@ -1,1 +1,6 @@
-flask requests pandas numpy python-binance pyTelegramBotAPI
+flask
+requests
+pandas
+numpy
+python-binance
+pyTelegramBotAPI
