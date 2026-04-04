@@ -591,7 +591,10 @@ JSON:
   "news_impact": "POSITIVO"|"NEGATIVO"|"NEUTRAL",
   "whale_alert": true|false,
   "warnings": []
-}}"""
+}}REGLAS DE DECISIÓN:
+- Si MTF tiene 3+ timeframes ALCISTA y ML_SCORE >= 45: señal BUY
+- Si MTF tiene 3+ timeframes BAJISTA y ML_SCORE <= 45: señal SELL  
+- En cualquier otro caso: WAIT"""
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
