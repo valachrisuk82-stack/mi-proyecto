@@ -485,7 +485,7 @@ def update_all():
             conf = ml["confidence"]
             prev = cache["last_alerts"].get(pair,{}).get("signal")
 
-            if sig in ["BUY","SELL"] and pair in ["BTCUSDT","ETHUSDT","XRPUSDT"] and conf >= 65:
+            if sig in ["BUY","SELL"] and pair in ["BTCUSDT","ETHUSDT","XRPUSDT"] and sig != prev:
                 price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
                 atr   = ind.get("atr", price*0.012)
                 sl    = price - atr*1.5 if sig!="SELL" else price + atr*1.5
@@ -591,10 +591,7 @@ JSON:
   "news_impact": "POSITIVO"|"NEGATIVO"|"NEUTRAL",
   "whale_alert": true|false,
   "warnings": []
-}}REGLAS DE DECISIÓN:
-- Si MTF tiene 3+ timeframes ALCISTA y ML_SCORE >= 45: señal BUY
-- Si MTF tiene 3+ timeframes BAJISTA y ML_SCORE <= 45: señal SELL  
-- En cualquier otro caso: WAIT"""
+}}T"""
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
