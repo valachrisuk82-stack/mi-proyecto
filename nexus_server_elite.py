@@ -29,7 +29,7 @@ from collections import deque
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
     "anthropic_api_key": "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",
-    "telegram_token":    "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
+    "telegram_token":    "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
     "risk_pct":          1.0,
@@ -388,7 +388,7 @@ class MLScorer:
         total = max(0, min(100, total))
 
         # Signal
-        if total >= 68:   signal, conf = "BUY",  round(min(95, total))
+        if total >= 45:   signal, conf = "BUY",  round(min(95, total))
         elif total <= 32: signal, conf = "SELL", round(min(95, 100-total))
         else:             signal, conf = "WAIT", round(50)
 
@@ -485,11 +485,11 @@ def update_all():
             conf = ml["confidence"]
             prev = cache["last_alerts"].get(pair,{}).get("signal")
 
-            if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
+            if sig in ["BUY","SELL"] and pair in ["BTCUSDT","ETHUSDT","XRPUSDT"] and conf >= 65:
                 price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
                 atr   = ind.get("atr", price*0.012)
-                sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-                tp    = price + atr*3   if sig=="BUY" else price - atr*3
+                sl    = price - atr*1.5 if sig!="SELL" else price + atr*1.5
+                tp    = price + atr*3   if sig!="SELL" else price - atr*3
                 trail = calc_trailing_stop(sig, price, price, atr)
                 msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
                 send_telegram(msg)
@@ -663,7 +663,9 @@ def tickers():
             "patterns":  ind.get("patterns",[]),
             "rsi":       ind.get("rsi",0),
             "whale":     ob.get("whale_signal","NEUTRAL"),
-            "news":      news.get("label","NEUTRAL"),
+            "news":      news.get("label","NEUTRAL"),"sl":       round(float(t.get("lastPrice",0)) - ind.get("atr",float(t.get("lastPrice",0))*0.012)*1.5, 2) if ml["signal"]!="SELL" else round(float(t.get("lastPrice",0)) + ind.get("atr",float(t.get("lastPrice",0))*0.012)*1.5, 2),
+            "tp":       round(float(t.get("lastPrice",0)) + ind.get("atr",float(t.get("lastPrice",0))*0.012)*3, 2) if ml["signal"]!="SELL" else round(float(t.get("lastPrice",0)) - ind.get("atr",float(t.get("lastPrice",0))*0.012)*3, 2),
+            
         }
     return jsonify(result)
 
