@@ -60,7 +60,8 @@ def send_telegram(message):
         if "TU_API" in token: return
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
-    except Exception as e:
+    except:
+        pass
     print(f"Telegram error: {e}")
     time.sleep(2)
     try:
@@ -105,10 +106,8 @@ def get_klines(symbol, interval, limit):
             df[col] = df[col].astype(float)
         df["time"] = pd.to_datetime(df["time"], unit="ms")
         return df
-    except Exception as e:
-        print(f"[ERROR] klines {symbol}: {e}")
-        return pd.DataFrame()
-
+    except:
+        pass
 def get_all_tickers():
     try:
         syms = "[" + ",".join(f'"{p}"' for p in PAIRS) + "]"
@@ -506,9 +505,8 @@ def update_all():
 
             print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
             time.sleep(0.25)
-        except Exception as e:
-            print(f"  ✗ {pair}: {e}")
-
+        except:
+            pass
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")
@@ -698,17 +696,15 @@ def analyze(symbol):
     try:
         result = analyze_ai(symbol.upper())
         return jsonify({"ok":True,"result":result})
-    except Exception as e:
-        return jsonify({"ok":False,"error":str(e)}), 500
-
+    except:
+        pass
 @app.route("/api/mtf/<symbol>")
 def mtf(symbol):
     try:
         result = multi_tf_analysis(symbol.upper())
         return jsonify({"ok":True,"result":result})
-    except Exception as e:
-        return jsonify({"ok":False,"error":str(e)}), 500
-
+    except:
+        pass
 @app.route("/api/history")
 def history():
     return jsonify(cache["history"])
