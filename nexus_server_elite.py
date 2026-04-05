@@ -1,3 +1,4 @@
+import os
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║   NEXUS PRO ELITE — Servidor con ML + Trailing Stop             ║
