@@ -1,8 +1,8 @@
 import os
 
-
+# ══════════════════════════════════════════════════════════════════
 #  BINANCE API
-
+# ══════════════════════════════════════════════════════════════════
 def get_klines(symbol, interval, limit):
     try:
         headers = {"X-MBX-APIKEY": CONFIG.get("binance_api_key", "")}
@@ -29,7 +29,7 @@ def get_all_tickers():
     except: return {}
 
 def get_orderbook_deep(symbol, limit=100):
-
+    """Order flow análisis profundo"""
     try:
         r = requests.get(f"{BASE}/depth", params={"symbol": symbol, "limit": limit}, timeout=5)
         d = r.json()
@@ -69,9 +69,9 @@ def get_fear_greed():
     except:
         return {"value": 50, "label": "Neutral"}
 
-
-
-
+# ══════════════════════════════════════════════════════════════════
+#  NOTICIAS CRYPTO — SENTIMIENTO
+# ══════════════════════════════════════════════════════════════════
 POSITIVE_WORDS = ["bull", "rally", "surge", "pump", "breakout", "ath", "adoption",
                   "partnership", "launch", "upgrade", "buy", "positive", "growth",
                   "gain", "rise", "high", "record", "support", "accumulate"]
@@ -112,9 +112,9 @@ def get_news_sentiment(symbol):
         "headlines": headlines[:5],
     }
 
-
-
-
+# ══════════════════════════════════════════════════════════════════
+#  INDICADORES TÉCNICOS
+# ══════════════════════════════════════════════════════════════════
 def calc_rsi(df, period=14):
     delta = df["close"].diff()
     gain  = delta.where(delta > 0, 0).rolling(period).mean()
@@ -175,14 +175,14 @@ def detect_patterns(df):
     c,o,h,l = df["close"].values, df["open"].values, df["high"].values, df["low"].values
     i = len(df)-1
     body = abs(c[i]-o[i]); full = h[i]-l[i]; uw = h[i]-max(c[i],o[i]); lw = min(c[i],o[i])-l[i]
-
+    if full>0 and body/full<0.1: patterns.append({"name":"DOJI","type":"neutral","desc":"Indecisión"})
     if lw>body*2 and uw<body*0.5 and c[i]>o[i]: patterns.append({"name":"MARTILLO","type":"bull","desc":"Rebote alcista"})
     if uw>body*2 and lw<body*0.5 and c[i]<o[i]: patterns.append({"name":"SHOOTING STAR","type":"bear","desc":"Rechazo bajista"})
-
-
-
-
-
+    if i>0 and c[i-1]<o[i-1] and c[i]>o[i] and c[i]>o[i-1] and o[i]<c[i-1]: patterns.append({"name":"ENGULFING ALCISTA","type":"bull","desc":"Reversión al alza"})
+    if i>0 and c[i-1]>o[i-1] and c[i]<o[i] and c[i]<o[i-1] and o[i]>c[i-1]: patterns.append({"name":"ENGULFING BAJISTA","type":"bear","desc":"Reversión a la baja"})
+    if i>=2 and c[i-2]<o[i-2] and abs(c[i-1]-o[i-1])<(h[i-1]-l[i-1])*0.3 and c[i]>o[i] and c[i]>(o[i-2]+c[i-2])/2: patterns.append({"name":"MORNING STAR","type":"bull","desc":"Reversión alcista fuerte"})
+    if i>=2 and c[i-2]>o[i-2] and abs(c[i-1]-o[i-1])<(h[i-1]-l[i-1])*0.3 and c[i]<o[i] and c[i]<(o[i-2]+c[i-2])/2: patterns.append({"name":"EVENING STAR","type":"bear","desc":"Reversión bajista fuerte"})
+    if body>0 and uw<body*0.05 and lw<body*0.05: patterns.append({"name":"MARUBOZU "+"ALCISTA" if c[i]>o[i] else "BAJISTA","type":"bull" if c[i]>o[i] else "bear","desc":"Presión fuerte"})
     return patterns
 
 def calc_sr(df, lookback=80):
@@ -219,14 +219,14 @@ def calc_all_indicators(df):
         "candles":  len(df),
     }
 
-
+# ══════════════════════════════════════════════════════════════════
 #  ML SCORING SYSTEM
-
+# ══════════════════════════════════════════════════════════════════
 class MLScorer:
     """Sistema de scoring basado en reglas ML-inspired"""
 
     def __init__(self):
-
+        # Pesos optimizados basados en backtesting histórico
         self.weights = {
             "rsi":       0.20,
             "macd":      0.18,
@@ -320,11 +320,11 @@ class MLScorer:
 
 ml_scorer = MLScorer()
 
-
+# ══════════════════════════════════════════════════════════════════
 #  TRAILING STOP
-
+# ══════════════════════════════════════════════════════════════════
 def calc_trailing_stop(signal, entry, current_price, atr):
-
+    """Calcula trailing stop dinámico basado en ATR"""
     mult = CONFIG["trailing_atr_mult"]
     if signal == "BUY":
         # Trail stop sube con el precio
@@ -338,9 +338,9 @@ def calc_trailing_stop(signal, entry, current_price, atr):
         active_sl  = min(initial_sl, trail_sl)
         return round(active_sl, 6)
 
-
+# ══════════════════════════════════════════════════════════════════
 #  MULTI-TIMEFRAME
-
+# ══════════════════════════════════════════════════════════════════
 def multi_tf_analysis(symbol):
     result = {}
     for tf in ["1m","5m","15m","1h"]:
@@ -364,9 +364,9 @@ def multi_tf_analysis(symbol):
     else:         conf = "NEUTRAL"
     return {"timeframes": result, "confluence": conf, "bull": bull, "bear": bear}
 
-
+# ══════════════════════════════════════════════════════════════════
 #  CACHE
-
+# ══════════════════════════════════════════════════════════════════
 cache = {
     "tickers":    {},
     "indicators": {},
@@ -410,20 +410,20 @@ def update_all():
                 sl    = price - atr*1.5 if sig!="SELL" else price + atr*1.5
                 tp    = price + atr*3   if sig!="SELL" else price - atr*3
                 trail = calc_trailing_stop(sig, price, price, atr)
-
+                msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
                 send_telegram(msg)
                 cache["last_alerts"][pair] = {"signal":sig,"time":datetime.now()}
                 cache["history"].insert(0,{"time":datetime.now().strftime("%H:%M:%S"),"pair":pair,"signal":sig,"confidence":conf,"price":round(price,4),"ml_score":ml["ml_score"],"source":"AUTO"})
                 if len(cache["history"])>100: cache["history"]=cache["history"][:100]
 
-
+            print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
             time.sleep(0.25)
         except Exception as e:
-
+            print(f"  ✗ {pair}: {e}")
 
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
-
+    print(f"[OK] Elite update complete — {cache['last_update']}")
 
 def news_updater():
     """Actualiza noticias cada 5 minutos"""
@@ -440,9 +440,9 @@ def bg_updater():
         update_all()
         time.sleep(CONFIG["refresh_sec"])
 
-
+# ══════════════════════════════════════════════════════════════════
 #  CLAUDE AI
-
+# ══════════════════════════════════════════════════════════════════
 def analyze_ai(pair):
     client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
     ticker = cache["tickers"].get(pair, {})
@@ -456,26 +456,26 @@ def analyze_ai(pair):
     capital = CONFIG["capital"]
     risk    = CONFIG["risk_pct"]
 
-
+    headlines_str = "\n".join(f"  • {h}" for h in news.get("headlines",[])[:3]) or "  Sin noticias recientes"
     patterns_str  = ", ".join(p["name"] for p in ind.get("patterns",[])) or "Ninguno"
 
+    prompt = f"""Eres NEXUS PRO ELITE AI — sistema institucional de análisis crypto con ML integrado.
+Responde ÚNICAMENTE con JSON válido.
 
-
-
-PAR: {pair} | PRECIO: ${price:,.6f} | CAMBIO 24H: {float(ticker.get('priceChangePercent',0)):.2f}%
+PAR: {pair} | PRECIO: {price:.2f} | CAMBIO 24H: {float(ticker.get('priceChangePercent',0)):.2f}%
 TIMEFRAME: {CONFIG['kline_tf']} | VELAS: {ind.get('candles',0)}
 
-
+INDICADORES TÉCNICOS REALES:
 RSI(14): {ind.get('rsi','?')} | ATR: {atr:.6f}
 EMA 9: {ind.get('ema9','?')} | EMA 21: {ind.get('ema21','?')} | EMA 50: {ind.get('ema50','?')}
-
-
-
+MACD hist: {ind.get('macd',{}).get('hist','?')} | línea: {ind.get('macd',{}).get('line','?')}
+BB posición: {ind.get('bb',{}).get('pos','?')}% | ancho: {ind.get('bb',{}).get('width','?')}%
+Estocástico K: {ind.get('stoch',{}).get('k','?')} D: {ind.get('stoch',{}).get('d','?')}
 Volumen ratio: {ind.get('vol',{}).get('ratio','?')}x | Buy%: {ind.get('vol',{}).get('buy_pct','?')}%
 
 ORDER FLOW AVANZADO:
 Imbalance: {ob.get('imbalance',0):.1f}% | Ballenas BUY: {ob.get('whale_bids',0):.2f} | Ballenas SELL: {ob.get('whale_asks',0):.2f}
-
+Señal ballenas: {ob.get('whale_signal','NEUTRAL')}
 
 PATRONES DE VELAS: {patterns_str}
 SOPORTES: {ind.get('sr',{}).get('support',[])}
@@ -489,24 +489,24 @@ Headlines:
 
 FEAR & GREED: {fgi['value']} ({fgi['label']})
 
-
+GESTIÓN RIESGO:
 Capital: ${capital} | Riesgo: {risk}% | SL=1.5xATR | TP=3xATR
 
 JSON:
 {{
   "signal": "BUY"|"SELL"|"WAIT",
   "confidence": 0-100,
-
-
-
-
-
-
+  "entry": número,
+  "sl": número,
+  "tp": número,
+  "trailing_sl": número,
+  "rr": número,
+  "lot": número,
   "trend": "ALCISTA"|"BAJISTA"|"LATERAL",
-
-
-
-
+  "strength": "FUERTE"|"MODERADO"|"DÉBIL",
+  "reasoning": "máximo 2 oraciones en español",
+  "key_support": número,
+  "key_resistance": número,
   "news_impact": "POSITIVO"|"NEGATIVO"|"NEUTRAL",
   "whale_alert": true|false,
   "warnings": []
@@ -549,9 +549,9 @@ JSON:
             send_telegram(msg)
     return result
 
-
+# ══════════════════════════════════════════════════════════════════
 #  FLASK
-
+# ══════════════════════════════════════════════════════════════════
 app = Flask(__name__)
 CORS(app)
 
@@ -686,23 +686,22 @@ def calc_stats(trades, capital, curve):
     return {"total_return":round(tr,2),"final_equity":round(equity,2),"win_rate":round(wr,1),
             "profit_factor":round(pf,2),"max_drawdown":round(maxDD,1),"total_trades":len(trades)}
 
-
+# ══════════════════════════════════════════════════════════════════
 #  ARRANQUE
-
+# ══════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-
-
-
+    print("\n"+"═"*58)
+    print("  NEXUS PRO ELITE — Bloomberg Terminal Style")
+    print("═"*58)
     print(f"  Capital:   ${CONFIG['capital']} USDT | Riesgo: {CONFIG['risk_pct']}%")
     print(f"  ML Score:  ACTIVO | Trailing Stop: ACTIVO")
     print(f"  News:      ACTIVO | Order Flow: ACTIVO")
-
-
+    print(f"  Telegram:  {'✅' if 'TU_API' not in CONFIG['telegram_token'] else '⚠️  Configura token'}")
+    print("═"*58)
     threading.Thread(target=update_all, daemon=True).start()
     threading.Thread(target=bg_updater, daemon=True).start()
     threading.Thread(target=news_updater, daemon=True).start()
-
-
+    print("\n  ✅ Servidor listo en http://localhost:5001")
+    print("  → Abre nexus_elite.html en tu navegador\n")
     port = int(os.environ.get('PORT', 5001))
     app.run(host="0.0.0.0", port=port, debug=False)
-
