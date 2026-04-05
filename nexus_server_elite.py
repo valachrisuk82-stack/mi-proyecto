@@ -31,6 +31,9 @@ CONFIG = {
     "anthropic_api_key": "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",
     "telegram_token":    "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
+"binance_api_key": "VA1R6ANZzd7EPcGHJW14WXGQxTVj0HUXE0pIDMQTNZXEZx4PeyFgfbpACbWpzkSQ",
+"binance_secret_key": "dLGeaxiQVflpLmJrQl2zpa5dN8ldkN0QhyWXmDmKBq0xXPSfPacIm0wU8Bq77yha",
+"capital": 1000.0,
     "capital":           1000.0,
     "risk_pct":          1.0,
     "kline_tf":          "5m",
@@ -60,14 +63,13 @@ def send_telegram(message):
         if "TU_API" in token: return
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
-    except:
-        pass
-    print(f"Telegram error: {e}")
-    time.sleep(2)
-    try:
-        requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=10)
-    except:
-        pass
+    except Exception as e:
+                print(f"Telegram error: {e}")
+                time.sleep(2)
+                try:
+                    requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=10)
+                except:
+                    pass
 
 
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
@@ -95,8 +97,9 @@ def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_scor
 # ══════════════════════════════════════════════════════════════════
 def get_klines(symbol, interval, limit):
     try:
+        headers = {"X-MBX-APIKEY": CONFIG.get("binance_api_key", "")}
         r = requests.get(f"{BASE}/klines",
-            params={"symbol": symbol, "interval": interval, "limit": limit}, timeout=8)
+            params={"symbol": symbol, "interval": interval, "limit": limit}, headers=headers, timeout=8)
         data = r.json()
         df = pd.DataFrame(data, columns=[
             "time","open","high","low","close","volume",
@@ -106,8 +109,10 @@ def get_klines(symbol, interval, limit):
             df[col] = df[col].astype(float)
         df["time"] = pd.to_datetime(df["time"], unit="ms")
         return df
-    except:
-        pass
+    except Exception as e:
+        print(f"[ERROR] klines {symbol}: {e}")
+        return pd.DataFrame()
+
 def get_all_tickers():
     try:
         syms = "[" + ",".join(f'"{p}"' for p in PAIRS) + "]"
@@ -505,8 +510,9 @@ def update_all():
 
             print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
             time.sleep(0.25)
-        except:
-            pass
+        except Exception as e:
+            print(f"  ✗ {pair}: {e}")
+
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")
@@ -696,15 +702,17 @@ def analyze(symbol):
     try:
         result = analyze_ai(symbol.upper())
         return jsonify({"ok":True,"result":result})
-    except:
-        pass
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}), 500
+
 @app.route("/api/mtf/<symbol>")
 def mtf(symbol):
     try:
         result = multi_tf_analysis(symbol.upper())
         return jsonify({"ok":True,"result":result})
-    except:
-        pass
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}), 500
+
 @app.route("/api/history")
 def history():
     return jsonify(cache["history"])
