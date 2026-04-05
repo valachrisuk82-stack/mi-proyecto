@@ -1,6 +1,4 @@
 import os
-"""
-╔══════════════════════════════════════════════════════════════════╗
 ║   NEXUS PRO ELITE — Servidor con ML + Trailing Stop             ║
 ║   Order Flow + Noticias Crypto + Bloomberg Style                ║
 ╚══════════════════════════════════════════════════════════════════╝
