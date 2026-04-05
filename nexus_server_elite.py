@@ -36,7 +36,7 @@ CONFIG = {
     "kline_tf":          "5m",
     "kline_limit":       200,
     "refresh_sec":       30,
-    "min_confidence":    72,
+    "min_confidence":    55,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
 
@@ -60,7 +60,14 @@ def send_telegram(message):
         if "TU_API" in token: return
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
-    except: pass
+    except Exception as e:
+    print(f"Telegram error: {e}")
+    time.sleep(2)
+    try:
+        requests.post(url, json={"chat_id": chat_id, "text": message}, timeout=10)
+    except:
+        pass
+
 
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
     emoji = "🟢" if signal == "BUY" else "🔴"
