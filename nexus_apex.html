@@ -572,7 +572,7 @@ canvas{position:absolute;top:0;left:0}
 
     <div class="upd-bar">
       <span>UPD: <span id="updTime">--</span></span>
-      <span class="upd-real" id="dataSource">DEMO</span>
+      <span class="upd-real" id="dataSource">REAL</span>
     </div>
   </div>
 
@@ -580,7 +580,8 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <script>
-const API = "http://localhost:5001/api";
+const API = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:5001/api' : `${window.location.protocol}//${window.location.hostname}/api`;
+
 const PAIRS = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","DOTUSDT","MATICUSDT","LINKUSDT","UNIUSDT","ATOMUSDT","LTCUSDT","ETCUSDT","XLMUSDT","NEARUSDT","ALGOUSDT","FTMUSDT","SANDUSDT","MANAUSDT","AAVEUSDT","SHIBUSDT","TRXUSDT"];
 
 const S = {
@@ -597,7 +598,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setInterval(checkServer, 8000);
   setInterval(fetchTickers, 7000);
   setInterval(() => fetchCandles(S.pair, S.tf), 25000);
-  setInterval(() => runMTF(), 30000);
+  setInterval(() => runMTF(), 10000);
   window.addEventListener("resize", () => drawCandles(S.candles));
   document.getElementById("pairCnt");
   selectPair("BTCUSDT");
@@ -1015,12 +1016,13 @@ function localAI(pair){
   if(hist>0)score+=1;else score-=1;
   if(ema9>ema21)score+=1;else score-=1;
   patterns.forEach(p=>{if(p.type==="bull")score+=1;else if(p.type==="bear")score-=1;});
-  const sig=sconst mtfBull = S.sigs[pair]?.mtf?.m5==="ALCISTA"&&S.sigs[pair]?.mtf?.m15==="ALCISTA";
+  const mtfBull = S.sigs[pair]?.mtf?.m5==="ALCISTA"&&S.sigs[pair]?.mtf?.m15
 const mtfBear = S.sigs[pair]?.mtf?.m5==="BAJISTA"&&S.sigs[pair]?.mtf?.m15==="BAJISTA";
-const conf = t.confidence||0; const sig = (score>=2&&mtfBull&&conf>=75)?"BUY":(score<=-2&&mtfBear&&conf>=75)?"SELL":"WAIT";
-  const sl=sig==="BUY"?price-atr*1.5:price+atr*1.5;
-  const tp=sig==="BUY"?price+atr*3:price-atr*3;
-  const trail=sig==="BUY"?price-atr*2:price+atr*2;
+const sig = (score>=26&&mtfAlcista&&conf>=45)?"BUY":(score<=-26&&mtfBajista&&conf>=45)?"SELL":"WAIT";
+const dir=sig==="SELL"?"SELL":"BUY";
+const sl=S.sigs[pair]?.sl||(dir==="BUY"?price-atr*1.5:price+atr*1.5);
+const tp=S.sigs[pair]?.tp||(dir==="BUY"?price+atr*3:price-atr*3);
+const trail=dir==="BUY"?price-atr*2:price+atr*2;
   const cap=parseFloat(document.getElementById("inpCap").value)||1000;
   const risk=parseFloat(document.getElementById("inpRisk").value)||1;
   const lot=(cap*risk/100)/Math.abs(price-sl)||0;
@@ -1044,7 +1046,7 @@ function applyResult(r,pair){
   document.getElementById("aiStrength").innerHTML=str?`<span class="ai-strength str-${str}">${str}</span>`:"";
   document.getElementById("aiWhale").style.display=r.whale_alert?"block":"none";
 
-  const f=v=>"$"+parseFloat(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4});
+  const f=v=>"$"+parseFloat(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   ["entry","sl","trail","tp","lot","rr"].forEach(k=>{
     const el=document.getElementById("lv"+k.charAt(0).toUpperCase()+k.slice(1));
     if(el)el.textContent=k==="lot"?(lot.toFixed(4)+" u"):k==="rr"?("1:"+parseFloat(rr).toFixed(1)):f(k==="trail"?trail:k==="sl"?sl:k==="tp"?tp:r.entry||price);
@@ -1083,7 +1085,7 @@ function applyResult(r,pair){
     renderSR(pair);
   }
 
-  S.sigs[pair]={signal:sig,confidence:conf};
+  S.sigs[pair]={signal:sig,confidence:conf,sl:t.sl,tp:t.tp};
   const pb=document.getElementById("pb_"+pair);if(pb){pb.textContent=sig;pb.className="badge "+sig;}
   if(sig!=="WAIT")showAlert(pair,sig);
 
@@ -1092,6 +1094,8 @@ function applyResult(r,pair){
   analyzeBtn.className="analyze-btn success";
   setTimeout(()=>{analyzeBtn.textContent="▶ ANALIZAR CON IA";analyzeBtn.className="analyze-btn";},4000);
 }
+setInterval(()=>{ runMTF(); setTimeout(()=>{ runAI(); }, 3000); }, 30000);
+setTimeout(()=>{ runMTF(); setTimeout(()=>{ runAI(); }, 3000); }, 2000);
 
 function clearAI(){
   ["lvEntry","lvSl","lvTrail","lvTp","lvLot","lvRr","mSl","mTrail","mTp","mLot","mRr"].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent="---";});
