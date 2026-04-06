@@ -30,8 +30,8 @@ from collections import deque
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
-    "telegram_token":    "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
-    "telegram_chat_id":  "8204656882",
+    "telegram_token":    os.environ.get("TELEGRAM_TOKEN", "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo"),
+    "telegram_chat_id":  os.environ.get("TELEGRAM_CHAT_ID", "8204656882"),
     "capital":           1000.0,
     "risk_pct":          1.0,
     "kline_tf":          "5m",
