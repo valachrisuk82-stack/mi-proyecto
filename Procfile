@@ -1,1 +1,1 @@
-web: gunicorn nexus_server_elite:app
+web: python nexus_server_elite.py
