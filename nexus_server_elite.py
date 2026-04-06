@@ -773,4 +773,5 @@ if __name__ == "__main__":
 
     print("\n  ✅ Servidor listo en http://localhost:5000")
     print("  → Abre nexus_dashboard.html en tu navegador\n")
-    app.run(host="0.0.0.0", port=5001, debug=False)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False)
