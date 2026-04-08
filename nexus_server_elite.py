@@ -30,14 +30,14 @@ from collections import deque
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
-    "telegram_token":    os.environ.get("TELEGRAM_TOKEN", "NUEVO_TOKEN"),
-    "telegram_chat_id":  os.environ.get("TELEGRAM_CHAT_ID", "8204656882"),
+    "telegram_token": "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
+    "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
     "risk_pct":          1.0,
     "kline_tf":          "5m",
     "kline_limit":       200,
     "refresh_sec":       30,
-    "min_confidence":    72,
+    "min_confidence":    55,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
 
@@ -48,6 +48,12 @@ PAIRS = [
     "XLMUSDT","NEARUSDT","ALGOUSDT","FTMUSDT","SANDUSDT",
     "MANAUSDT","AAVEUSDT","SHIBUSDT","TRXUSDT",
 ]
+
+FOREX_PAIRS = {"EURUSD":"EURUSD=X","GBPUSD":"GBPUSD=X","USDJPY":"JPY=X","AUDUSD":"AUDUSD=X","USDCHF":"CHF=X","USDCAD":"CAD=X","NZDUSD":"NZDUSD=X","EURGBP":"EURGBP=X"}
+COMMODITIES = {"XAUUSD":"GC=F","XAGUSD":"SI=F","USOIL":"CL=F","UKOIL":"BZ=F","NATGAS":"NG=F","COPPER":"HG=F","WHEAT":"ZW=F","CORN":"ZC=F"}
+INDICES     = {"SPX500":"^GSPC","NAS100":"^IXIC","DOW30":"^DJI","DAX40":"^GDAXI","FTSE100":"^FTSE","NIK225":"^N225","VIX":"^VIX"}
+STOCKS      = {"AAPL":"AAPL","TSLA":"TSLA","NVDA":"NVDA","AMZN":"AMZN","MSFT":"MSFT","GOOGL":"GOOGL","META":"META","NFLX":"NFLX"}
+ALL_EXTERNAL = {**FOREX_PAIRS,**COMMODITIES,**INDICES,**STOCKS}
 
 BASE = "https://api.binance.com/api/v3"
 
@@ -142,6 +148,38 @@ def get_orderbook_deep(symbol, limit=100):
         }
     except:
         return {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
+
+def get_yahoo_klines(symbol, yf_ticker, tf="5m"):
+    try:
+        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
+        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
+        yf_tf  = tf_map.get(tf, "5m")
+        period = per_map.get(yf_tf, "5d")
+        url    = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+        r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
+        chart = r.json()["chart"]["result"][0]
+        ts = chart["timestamp"]
+        q  = chart["indicators"]["quote"][0]
+        df = pd.DataFrame({"time":pd.to_datetime(ts,unit="s"),"open":q["open"],"high":q["high"],"low":q["low"],"close":q["close"],"volume":[x or 0 for x in q.get("volume",[0]*len(ts))]}).dropna()
+        df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
+        return df
+    except Exception as e:
+        print(f"[ERROR] Yahoo klines {symbol}: {e}")
+        return pd.DataFrame()
+
+def get_yahoo_price(symbol, yf_ticker):
+    try:
+        url  = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+        r    = requests.get(url, params={"interval":"1m","range":"1d"}, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
+        meta = r.json()["chart"]["result"][0]["meta"]
+        price = float(meta.get("regularMarketPrice", 0))
+        prev  = float(meta.get("previousClose", price) or price)
+        chg   = ((price - prev) / prev * 100) if prev else 0
+        return {"lastPrice":str(round(price,4)),"priceChangePercent":str(round(chg,2)),"highPrice":str(meta.get("regularMarketDayHigh",price)),"lowPrice":str(meta.get("regularMarketDayLow",price)),"volume":str(meta.get("regularMarketVolume",0))}
+    except Exception as e:
+        print(f"[ERROR] Yahoo price {symbol}: {e}")
+        return {}
+
 
 def get_fear_greed():
     try:
@@ -459,7 +497,7 @@ cache = {
     "history":    [],
     "last_update":None,
     "updating":   False,
-    "last_alerts":{},
+    "last_alerts":{},"ext_tickers":{},
 }
 
 def update_all():
@@ -503,6 +541,7 @@ def update_all():
         except Exception as e:
             print(f"  ✗ {pair}: {e}")
 
+
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")
@@ -516,6 +555,36 @@ def news_updater():
                 time.sleep(2)
             except: pass
         time.sleep(300)
+
+def update_external():
+    """Actualiza activos externos en thread separado cada 60 segundos"""
+    while True:
+        for symbol, yf_ticker in ALL_EXTERNAL.items():
+            try:
+                pd_data = get_yahoo_price(symbol, yf_ticker)
+                if pd_data: cache["ext_tickers"][symbol] = pd_data
+                df = get_yahoo_klines(symbol, yf_ticker)
+                if df.empty or len(df) < 20: continue
+                ind = calc_all_indicators(df)
+                ob  = {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
+                ml  = ml_scorer.score(ind, ob, 0)
+                cache["indicators"][symbol] = ind
+                cache["signals"][symbol]    = ml
+                sig  = ml["signal"]; conf = ml["confidence"]
+                prev = cache["last_alerts"].get(symbol,{}).get("signal")
+                if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev:
+                    price = float(pd_data.get("lastPrice",0))
+                    atr   = ind.get("atr", price*0.005)
+                    sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
+                    tp    = price + atr*3   if sig=="BUY" else price - atr*3
+                    trail = calc_trailing_stop(sig, price, price, atr)
+                    msg   = tg_alert(symbol, sig, conf, price, sl, tp, 2.0, trail, "Señal ML", ml["ml_score"], 0)
+                    send_telegram(msg)
+                    cache["last_alerts"][symbol] = {"signal":sig,"time":datetime.now()}
+                print(f"  ✓ {symbol}: ML={ml['ml_score']} → {sig} ({conf}%)")
+            except Exception as e:
+                print(f"  ✗ {symbol}: {e}")
+        time.sleep(60)
 
 def bg_updater():
     while True:
@@ -678,10 +747,15 @@ def indicators(symbol):
 
 @app.route("/api/klines/<symbol>")
 def klines(symbol):
+    sym   = symbol.upper()
     tf    = request.args.get("tf", CONFIG["kline_tf"])
     limit = int(request.args.get("limit",120))
-    df = get_klines(symbol.upper(), tf, limit)
+    if sym in ALL_EXTERNAL:
+        df = get_yahoo_klines(sym, ALL_EXTERNAL[sym], tf)
+    else:
+        df = get_klines(sym, tf, limit)
     if df.empty: return jsonify([])
+    df = df.tail(limit)
     return jsonify(df[["time","open","high","low","close","volume"]].assign(
         time=df["time"].astype(str)).to_dict(orient="records"))
 
@@ -704,6 +778,24 @@ def mtf(symbol):
 @app.route("/api/history")
 def history():
     return jsonify(cache["history"])
+
+
+@app.route("/api/ext_tickers")
+def ext_tickers():
+    result = {}
+    for symbol in ALL_EXTERNAL:
+        t  = cache["ext_tickers"].get(symbol, {})
+        ml = cache["signals"].get(symbol, {"signal":"SCAN","confidence":0,"ml_score":0})
+        result[symbol] = {
+            "price":float(t.get("lastPrice",0) or 0),
+            "change":float(t.get("priceChangePercent",0) or 0),
+            "high":float(t.get("highPrice",0) or 0),
+            "low":float(t.get("lowPrice",0) or 0),
+            "signal":ml.get("signal","SCAN"),
+            "confidence":ml.get("confidence",0),
+            "ml_score":ml.get("ml_score",0),
+        }
+    return jsonify(result)
 
 @app.route("/api/news/<symbol>")
 def news(symbol):
@@ -780,6 +872,7 @@ print(f"  Telegram:  {'✅' if 'TU_API' not in CONFIG['telegram_token'] else '�
 print("═"*58)
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
+threading.Thread(target=update_external, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 print("\n  ✅ Servidor listo en http://localhost:5001")
 print("  → Abre nexus_elite.html en tu navegador\n")
