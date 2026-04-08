@@ -24,6 +24,8 @@ import threading
 import re
 from datetime import datetime
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 
 # ══════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN
@@ -500,51 +502,78 @@ cache = {
     "last_alerts":{},"ext_tickers":{},
 }
 
+def process_pair(pair):
+    try:
+        df   = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
+        if df.empty: return pair, None
+        ind  = calc_all_indicators(df)
+        ob   = get_orderbook_deep(pair)
+        news = cache["news"].get(pair, {"score":0})
+        ml   = ml_scorer.score(ind, ob, news.get("score",0))
+        return pair, {"ind": ind, "ob": ob, "ml": ml, "news": news}
+    except Exception as e:
+        print(f"  ✗ {pair}: {e}")
+        return pair, None
+
 def update_all():
     if cache["updating"]: return
     cache["updating"] = True
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Actualizando NEXUS ELITE...")
-    tickers = get_all_tickers()
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Actualizando NEXUS ELITE (paralelo)...")
+
+    with ThreadPoolExecutor(max_workers=2) as meta_pool:
+        f_tickers = meta_pool.submit(get_all_tickers)
+        f_fgi     = meta_pool.submit(get_fear_greed)
+        tickers   = f_tickers.result()
+        fgi       = f_fgi.result()
+
     if tickers: cache["tickers"] = tickers
-    cache["fgi"] = get_fear_greed()
+    cache["fgi"] = fgi
 
-    for pair in PAIRS:
-        try:
-            df  = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
-            if df.empty: continue
-            ind = calc_all_indicators(df)
-            ob  = get_orderbook_deep(pair)
-            news = cache["news"].get(pair, {"score":0})
-            ml  = ml_scorer.score(ind, ob, news.get("score",0))
-            cache["indicators"][pair] = ind
-            cache["orderflow"][pair]  = ob
-            cache["signals"][pair]    = ml
+    results = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(process_pair, pair): pair for pair in PAIRS}
+        for future in as_completed(futures):
+            pair, data = future.result()
+            if data:
+                results[pair] = data
 
-            sig  = ml["signal"]
-            conf = ml["confidence"]
-            prev = cache["last_alerts"].get(pair,{}).get("signal")
+    for pair, data in results.items():
+        ind  = data["ind"]
+        ob   = data["ob"]
+        ml   = data["ml"]
+        news = data["news"]
 
-            if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
-                price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
-                atr   = ind.get("atr", price*0.012)
-                sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-                tp    = price + atr*3   if sig=="BUY" else price - atr*3
-                trail = calc_trailing_stop(sig, price, price, atr)
-                msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
-                send_telegram(msg)
-                cache["last_alerts"][pair] = {"signal":sig,"time":datetime.now()}
-                cache["history"].insert(0,{"time":datetime.now().strftime("%H:%M:%S"),"pair":pair,"signal":sig,"confidence":conf,"price":round(price,4),"ml_score":ml["ml_score"],"source":"AUTO"})
-                if len(cache["history"])>100: cache["history"]=cache["history"][:100]
+        cache["indicators"][pair] = ind
+        cache["orderflow"][pair]  = ob
+        cache["signals"][pair]    = ml
 
-            print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
-            time.sleep(0.25)
-        except Exception as e:
-            print(f"  ✗ {pair}: {e}")
+        sig  = ml["signal"]
+        conf = ml["confidence"]
+        prev = cache["last_alerts"].get(pair, {}).get("signal")
 
+        if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev:
+            price = float(cache["tickers"].get(pair, {}).get("lastPrice", 0))
+            atr   = ind.get("atr", price * 0.012)
+            sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
+            tp    = price + atr*3   if sig=="BUY" else price - atr*3
+            trail = calc_trailing_stop(sig, price, price, atr)
+            msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail,
+                             "Señal ML automática", ml["ml_score"], news.get("score",0))
+            send_telegram(msg)
+            cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
+            cache["history"].insert(0, {
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "pair": pair, "signal": sig, "confidence": conf,
+                "price": round(price, 4), "ml_score": ml["ml_score"], "source": "AUTO"
+            })
+            if len(cache["history"]) > 100:
+                cache["history"] = cache["history"][:100]
+
+        print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
 
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
-    print(f"[OK] Elite update complete — {cache['last_update']}")
+    print(f"[OK] Elite update complete — {cache['last_update']} ({len(results)}/{len(PAIRS)} pares)")
 
 def news_updater():
     """Actualiza noticias cada 5 minutos"""
