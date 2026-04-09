@@ -62,34 +62,115 @@ BASE = "https://api.binance.com/api/v3"
 # ══════════════════════════════════════════════════════════════════
 #  TELEGRAM
 # ══════════════════════════════════════════════════════════════════
-def send_telegram(message):
+def send_telegram(message, reply_markup=None):
     try:
         token   = CONFIG["telegram_token"]
         chat_id = CONFIG["telegram_chat_id"]
         if "TU_API" in token: return
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
+        url  = f"https://api.telegram.org/bot{token}/sendMessage"
+        body = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
+        if reply_markup:
+            body["reply_markup"] = reply_markup
+        requests.post(url, json=body, timeout=5)
     except: pass
 
+def send_telegram_photo(photo_url, caption):
+    try:
+        token   = CONFIG["telegram_token"]
+        chat_id = CONFIG["telegram_chat_id"]
+        if "TU_API" in token: return
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        requests.post(url, json={"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "HTML"}, timeout=5)
+    except: pass
+
+def daily_summary():
+    """Envía resumen diario a las 08:00 London"""
+    while True:
+        now = datetime.now()
+        if now.hour == 8 and now.minute == 0:
+            try:
+                signals = cache.get("history", [])[:20]
+                buys    = sum(1 for s in signals if s.get("signal") == "BUY")
+                sells   = sum(1 for s in signals if s.get("signal") == "SELL")
+                top     = sorted(signals, key=lambda x: x.get("confidence", 0), reverse=True)[:3]
+                top_str = ""
+                for s in top:
+                    e = "🟢" if s["signal"] == "BUY" else "🔴"
+                    top_str += f"  {e} {s['pair']} — {s['signal']} {s['confidence']}% @ ${s['price']:.4f}\n"
+                fgi = cache.get("fgi", {})
+                fgi_emoji = "😱" if fgi.get("value",50) < 25 else "😰" if fgi.get("value",50) < 45 else "😐" if fgi.get("value",50) < 55 else "😊" if fgi.get("value",50) < 75 else "🤑"
+                msg = f"""
+🌅 <b>NEXUS APEX — RESUMEN DIARIO</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+📅 {now.strftime('%A %d %B %Y')} | London
+{fgi_emoji} Fear & Greed: <b>{fgi.get('value',50)} — {fgi.get('label','Neutral')}</b>
+
+📊 <b>SEÑALES ÚLTIMAS HORAS:</b>
+  🟢 BUY:  <b>{buys}</b> señales
+  🔴 SELL: <b>{sells}</b> señales
+
+🏆 <b>TOP SEÑALES:</b>
+{top_str}
+━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 NEXUS APEX está activo y monitorizando {len(PAIRS)} pares
+💡 Usa /status para ver el estado en tiempo real"""
+                send_telegram(msg)
+            except Exception as e:
+                print(f"[ERROR] daily_summary: {e}")
+            time.sleep(61)
+        else:
+            time.sleep(30)
+
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
-    emoji = "🟢" if signal == "BUY" else "🔴"
+    emoji      = "🟢" if signal == "BUY" else "🔴"
     sent_emoji = "😊" if news_sent > 0 else "😰" if news_sent < 0 else "😐"
+    conf_bar   = "█" * (conf // 10) + "░" * (10 - conf // 10)
+    ml_bar     = "█" * (ml_score // 10) + "░" * (10 - ml_score // 10)
+    risk_usd   = round(CONFIG["capital"] * CONFIG["risk_pct"] / 100, 2)
+    pot_profit = round(risk_usd * rr, 2)
+    direction  = "LARGO 📈" if signal == "BUY" else "CORTO 📉"
+    sent_label = "POSITIVO" if news_sent > 0 else "NEGATIVO" if news_sent < 0 else "NEUTRAL"
+    now        = datetime.now().strftime("%H:%M:%S")
+    date       = datetime.now().strftime("%d/%m/%Y")
     return f"""
-{emoji} <b>NEXUS PRO ELITE — {signal}</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Par: <b>{pair}</b>
-💰 Entrada: <b>${entry:,.4f}</b>
-🛑 Stop Loss: <b>${sl:,.4f}</b>
-🔄 Trailing SL: <b>${trail_sl:,.4f}</b>
-🎯 Take Profit: <b>${tp:,.4f}</b>
-⚖️ R:R: <b>1:{rr}</b>
-🤖 Confianza IA: <b>{conf}%</b>
-🧠 Score ML: <b>{ml_score}/100</b>
-{sent_emoji} Sentimiento: <b>{'POSITIVO' if news_sent > 0 else 'NEGATIVO' if news_sent < 0 else 'NEUTRAL'}</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-💬 {reasoning}
-🕐 {datetime.now().strftime('%H:%M:%S')} London
-"""
+{emoji}<b>NEXUS APEX — SEÑAL {signal}</b> {emoji}
+┌─────────────────────────┐
+│  {pair:<10}  {direction}
+│  🕐 {now}  📅 {date}
+└─────────────────────────┘
+
+💰 <b>NIVELES DE PRECIO</b>
+  ┣ Entrada:      <b>${entry:,.5f}</b>
+  ┣ Stop Loss:    <b>${sl:,.5f}</b>  🛑
+  ┣ Trailing SL:  <b>${trail_sl:,.5f}</b>  🔄
+  ┗ Take Profit:  <b>${tp:,.5f}</b>  🎯
+
+⚖️ <b>GESTIÓN DE RIESGO</b>
+  ┣ Ratio R:R:    <b>1:{rr}</b>
+  ┣ Riesgo:       <b>${risk_usd} USDT</b>
+  ┗ Potencial:    <b>+${pot_profit} USDT</b>
+
+🤖 <b>ANÁLISIS IA</b>
+  ┣ Confianza:  <b>{conf}%</b>  [{conf_bar}]
+  ┣ Score ML:   <b>{ml_score}/100</b>  [{ml_bar}]
+  ┗ Sentimiento: {sent_emoji} <b>{sent_label}</b>
+
+💬 <i>{reasoning}</i>
+
+<b>⚡ NEXUS APEX</b> | London 🇬🇧"""
+
+def tg_alert_markup(pair, signal):
+    """Botones interactivos para la alerta"""
+    coin = pair.replace("USDT","")
+    return {
+        "inline_keyboard": [[
+            {"text": "📊 Ver Chart", "url": f"https://www.tradingview.com/chart/?symbol=BINANCE:{pair}"},
+            {"text": "⚡ Binance", "url": f"https://www.binance.com/en/trade/{coin}_USDT"},
+        ],[
+            {"text": "✅ Tomada", "callback_data": f"taken_{pair}_{signal}"},
+            {"text": "❌ Ignorada", "callback_data": f"skip_{pair}_{signal}"},
+        ]]
+    }
 
 # ══════════════════════════════════════════════════════════════════
 #  BINANCE API
@@ -559,7 +640,7 @@ def update_all():
             trail = calc_trailing_stop(sig, price, price, atr)
             msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail,
                              "Señal ML automática", ml["ml_score"], news.get("score",0))
-            send_telegram(msg)
+            send_telegram(msg, reply_markup=tg_alert_markup(pair, sig))
             cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
             cache["history"].insert(0, {
                 "time": datetime.now().strftime("%H:%M:%S"),
