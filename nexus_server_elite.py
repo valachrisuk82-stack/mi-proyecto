@@ -526,16 +526,44 @@ ml_scorer = MLScorer()
 # ══════════════════════════════════════════════════════════════════
 #  TRAILING STOP
 # ══════════════════════════════════════════════════════════════════
-def calc_precise_sl_tp(signal, price, atr, sr, bb, ob):
+def find_swing_levels(df, lookback=20):
+    """Detecta swing highs y lows reales de las últimas velas"""
+    if len(df) < lookback: return None, None
+    recent = df.iloc[-lookback:]
+    swing_high = float(recent["high"].max())
+    swing_low  = float(recent["low"].min())
+    # Refinar: buscar el swing más reciente significativo
+    for i in range(len(recent)-1, max(len(recent)-8, 0), -1):
+        h = float(recent["high"].iloc[i])
+        l = float(recent["low"].iloc[i])
+        if h >= swing_high * 0.999:
+            swing_high = h
+            break
+    for i in range(len(recent)-1, max(len(recent)-8, 0), -1):
+        l = float(recent["low"].iloc[i])
+        if l <= swing_low * 1.001:
+            swing_low = l
+            break
+    return swing_high, swing_low
+
+def calc_precise_sl_tp(signal, price, atr, sr, bb, ob, df=None):
     """SL/TP institucional cruzando SR, Fibonacci, ATR y orderbook"""
     supports    = sorted(sr.get("support", []), reverse=True)
     resistances = sorted(sr.get("resistance", []))
     bb_width    = bb.get("width", 5) / 100
-    vol_mult    = 1.0 + (bb_width * 2)  # más volátil = SL más amplio
+    vol_mult    = 1.0 + (bb_width * 2)
     atr_adj     = atr * vol_mult
 
+    # Swing levels reales del dataframe M5
+    swing_high_real, swing_low_real = (None, None)
+    if df is not None and not df.empty:
+        swing_high_real, swing_low_real = find_swing_levels(df, lookback=20)
+
     # Fibonacci del rango reciente
-    if supports and resistances:
+    if swing_high_real and swing_low_real:
+        swing_high = swing_high_real
+        swing_low  = swing_low_real
+    elif supports and resistances:
         swing_low  = supports[-1]  if supports  else price * 0.97
         swing_high = resistances[-1] if resistances else price * 1.03
         fib_range  = swing_high - swing_low
@@ -708,7 +736,8 @@ def update_all():
             atr   = ind.get("atr", price * 0.012)
             sr    = ind.get("sr", {})
             bb    = ind.get("bb", {})
-            sl, tp, _ = calc_precise_sl_tp(sig, price, atr, sr, bb, ob)
+            df_m5 = get_klines(pair, "5m", 50)
+            sl, tp, _ = calc_precise_sl_tp(sig, price, atr, sr, bb, ob, df_m5)
             trail = calc_trailing_stop(sig, price, price, atr)
             msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail,
                              "Señal ML automática", ml["ml_score"], news.get("score",0))
