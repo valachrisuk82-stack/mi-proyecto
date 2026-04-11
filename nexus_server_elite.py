@@ -526,11 +526,82 @@ ml_scorer = MLScorer()
 # ══════════════════════════════════════════════════════════════════
 #  TRAILING STOP
 # ══════════════════════════════════════════════════════════════════
+def calc_precise_sl_tp(signal, price, atr, sr, bb, ob):
+    """SL/TP institucional cruzando SR, Fibonacci, ATR y orderbook"""
+    supports    = sorted(sr.get("support", []), reverse=True)
+    resistances = sorted(sr.get("resistance", []))
+    bb_width    = bb.get("width", 5) / 100
+    vol_mult    = 1.0 + (bb_width * 2)  # más volátil = SL más amplio
+    atr_adj     = atr * vol_mult
+
+    # Fibonacci del rango reciente
+    if supports and resistances:
+        swing_low  = supports[-1]  if supports  else price * 0.97
+        swing_high = resistances[-1] if resistances else price * 1.03
+        fib_range  = swing_high - swing_low
+        fib_382    = swing_high - fib_range * 0.382
+        fib_500    = swing_high - fib_range * 0.500
+        fib_618    = swing_high - fib_range * 0.618
+    else:
+        fib_382 = price * 0.985
+        fib_500 = price * 0.975
+        fib_618 = price * 0.965
+
+    # Liquidez orderbook — nivel de ballenas
+    whale_bid = ob.get("whale_bids", 0)
+    whale_ask = ob.get("whale_asks", 0)
+
+    if signal == "BUY":
+        # SL: soporte más cercano debajo del precio O ATR ajustado
+        sl_sr  = max([s for s in supports if s < price * 0.999], default=None)
+        sl_atr = price - atr_adj * 1.5
+        sl_fib = fib_618 if fib_618 < price else fib_500
+
+        # Tomar el más conservador (más cercano) pero con mínimo 0.8x ATR
+        candidates = [x for x in [sl_sr, sl_atr, sl_fib] if x and x < price]
+        sl = max(candidates) if candidates else price - atr_adj * 1.5
+        sl = min(sl, price - atr * 0.8)  # mínimo buffer
+
+        # TP: resistencia más cercana O Fibonacci O 2xRiesgo mínimo
+        risk      = price - sl
+        tp_min    = price + risk * 2.0   # R:R mínimo 1:2
+        tp_sr     = min([r for r in resistances if r > price * 1.001], default=None)
+        tp_fib    = fib_382 if fib_382 > price else price + risk * 2.5
+
+        candidates_tp = [x for x in [tp_sr, tp_fib] if x and x > tp_min * 0.95]
+        tp = max(candidates_tp) if candidates_tp else tp_min
+
+        # Ajuste por ballenas — si hay presión compradora fuerte, TP más ambicioso
+        if whale_bid > whale_ask * 1.5:
+            tp = tp * 1.015
+
+    else:  # SELL
+        sl_sr  = min([r for r in resistances if r > price * 1.001], default=None)
+        sl_atr = price + atr_adj * 1.5
+        sl_fib = fib_382 if fib_382 > price else fib_500
+
+        candidates = [x for x in [sl_sr, sl_atr, sl_fib] if x and x > price]
+        sl = min(candidates) if candidates else price + atr_adj * 1.5
+        sl = max(sl, price + atr * 0.8)
+
+        risk      = sl - price
+        tp_min    = price - risk * 2.0
+        tp_sr     = max([s for s in supports if s < price * 0.999], default=None)
+        tp_fib    = fib_618 if fib_618 < price else price - risk * 2.5
+
+        candidates_tp = [x for x in [tp_sr, tp_fib] if x and x < tp_min * 1.05]
+        tp = min(candidates_tp) if candidates_tp else tp_min
+
+        if whale_ask > whale_bid * 1.5:
+            tp = tp * 0.985
+
+    rr = round(abs(tp - price) / abs(price - sl), 2) if abs(price - sl) > 0 else 2.0
+    return round(sl, 6), round(tp, 6), rr
+
 def calc_trailing_stop(signal, entry, current_price, atr):
     """Calcula trailing stop dinámico basado en ATR"""
     mult = CONFIG["trailing_atr_mult"]
     if signal == "BUY":
-        # Trail stop sube con el precio
         initial_sl = entry - atr * 1.5
         trail_sl   = current_price - atr * mult
         active_sl  = max(initial_sl, trail_sl)
@@ -635,8 +706,9 @@ def update_all():
         if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev:
             price = float(cache["tickers"].get(pair, {}).get("lastPrice", 0))
             atr   = ind.get("atr", price * 0.012)
-            sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-            tp    = price + atr*3   if sig=="BUY" else price - atr*3
+            sr    = ind.get("sr", {})
+            bb    = ind.get("bb", {})
+            sl, tp, _ = calc_precise_sl_tp(sig, price, atr, sr, bb, ob)
             trail = calc_trailing_stop(sig, price, price, atr)
             msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail,
                              "Señal ML automática", ml["ml_score"], news.get("score",0))
