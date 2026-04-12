@@ -31,7 +31,7 @@ import os
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
-    "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "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"),
+"anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
     "telegram_token": "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
