@@ -12,7 +12,7 @@ EJECUTAR:
     python3 nexus_server_elite.py
 """
 
-from flask import Flask, jsonify, request
+from flask import send_file, Flask, jsonify, request
 from flask_cors import CORS
 import anthropic
 import requests
@@ -31,7 +31,7 @@ import os
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
-    "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
+    "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "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"),
     "telegram_token": "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
@@ -233,6 +233,18 @@ def get_orderbook_deep(symbol, limit=100):
         return {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
 
 def get_yahoo_klines(symbol, yf_ticker, tf="5m"):
+    import time
+    cache_key = f"{symbol}_{tf}"
+    now = time.time()
+    if cache_key in _klines_cache and now - _klines_cache_time.get(cache_key, 0) < KLINES_TTL:
+        return _klines_cache[cache_key]
+    result = _get_yahoo_klines_raw(symbol, yf_ticker, tf)
+    if not result.empty:
+        _klines_cache[cache_key] = result
+        _klines_cache_time[cache_key] = now
+    return result
+
+def _get_yahoo_klines_raw(symbol, yf_ticker, tf="5m"):
     try:
         tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
         per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
@@ -241,7 +253,7 @@ def get_yahoo_klines(symbol, yf_ticker, tf="5m"):
         url    = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
         r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
         chart = r.json()["chart"]["result"][0]
-        ts = chart["timestamp"]
+        ts = chart.get("timestamp") or chart.get("indicators",{}).get("quote",[{}])[0].get("timestamp", [])
         q  = chart["indicators"]["quote"][0]
         df = pd.DataFrame({"time":pd.to_datetime(ts,unit="s"),"open":q["open"],"high":q["high"],"low":q["low"],"close":q["close"],"volume":[x or 0 for x in q.get("volume",[0]*len(ts))]}).dropna()
         df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
@@ -669,6 +681,12 @@ def multi_tf_analysis(symbol):
 # ══════════════════════════════════════════════════════════════════
 #  CACHE
 # ══════════════════════════════════════════════════════════════════
+
+# Cache para klines externos
+_klines_cache = {}
+_klines_cache_time = {}
+KLINES_TTL = 60  # segundos
+
 cache = {
     "tickers":    {},
     "indicators": {},
@@ -926,6 +944,12 @@ JSON:
 app = Flask(__name__)
 CORS(app)
 
+
+@app.route("/")
+@app.route("/app")
+def serve_app():
+    return send_file("nexus_apex-FINAL.html")
+
 @app.route("/api/status")
 def status():
     return jsonify({"ok":True,"last_update":cache["last_update"],"updating":cache["updating"],
@@ -1002,12 +1026,18 @@ def history():
 
 @app.route("/api/ext_tickers")
 def ext_tickers():
+    CAT_MAP = {}
+    for s in FOREX_PAIRS:  CAT_MAP[s] = "FOREX"
+    for s in COMMODITIES:  CAT_MAP[s] = "COMMODITIES"
+    for s in INDICES:      CAT_MAP[s] = "INDICES"
+    for s in STOCKS:       CAT_MAP[s] = "STOCKS"
     result = {}
     for symbol in ALL_EXTERNAL:
         t  = cache["ext_tickers"].get(symbol, {})
         ml = cache["signals"].get(symbol, {"signal":"SCAN","confidence":0,"ml_score":0})
         result[symbol] = {
             "price":float(t.get("lastPrice",0) or 0),
+            "category": CAT_MAP.get(symbol, "FOREX"),
             "change":float(t.get("priceChangePercent",0) or 0),
             "high":float(t.get("highPrice",0) or 0),
             "low":float(t.get("lowPrice",0) or 0),

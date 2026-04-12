@@ -376,84 +376,6 @@ canvas{position:absolute;top:0;left:0}
 
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
-.ext-card{background:#0d1117;border:1px solid #1e2530;border-radius:6px;padding:10px 12px;margin-bottom:6px;transition:border-color .2s}
-.ext-card:hover{border-color:#2a3545}
-.ext-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.ext-name{font-size:11px;font-weight:600;color:#c9d1d9;letter-spacing:.3px}
-.ext-signal{font-size:10px;font-weight:700;letter-spacing:.5px}
-.ext-card-mid{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-.ext-price-big{font-size:14px;font-weight:700;color:#e6edf3;font-family:monospace}
-.ext-chg{font-size:10px;font-weight:600}
-.chg-up{color:#00d4a0}.chg-dn{color:#ff4d6d}
-.ext-card-bot{display:flex;align-items:center;gap:8px}
-.ext-conf-bar{flex:1;height:2px;background:#1e2530;border-radius:1px}
-.ext-conf-fill{height:100%;border-radius:1px;transition:width .5s}
-.ext-conf-lbl{font-size:9px;color:#666;white-space:nowrap}
-
-.ext-group{margin-bottom:20px}
-.ext-group-header{font-size:9px;font-weight:800;letter-spacing:2px;color:#00d4a0;text-transform:uppercase;padding:8px 4px 6px;border-bottom:1px solid #0d2a1f;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.ext-card{background:linear-gradient(135deg,#0a0e1a 0%,#0d1117 100%);border:1px solid #161d2a;border-left:2px solid #1e2530;border-radius:4px;padding:8px 10px;margin-bottom:4px;transition:all .15s;cursor:pointer}
-.ext-card:hover{border-left-color:#00d4a0;background:linear-gradient(135deg,#0d1a14 0%,#0d1117 100%)}
-.ext-card.sig-buy{border-left-color:#00d4a0}
-.ext-card.sig-sell{border-left-color:#ff4d6d}
-.ext-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.ext-name{font-size:11px;font-weight:700;color:#c9d1d9;letter-spacing:.2px}
-.ext-signal{font-size:9px;font-weight:800;letter-spacing:.8px;padding:1px 5px;border-radius:2px}
-.ext-signal.sig-buy{background:#00d4a015;color:#00d4a0}
-.ext-signal.sig-sell{background:#ff4d6d15;color:#ff4d6d}
-.ext-signal.sig-wait{background:#33333315;color:#555}
-.ext-card-mid{display:flex;justify-content:space-between;align-items:baseline}
-.ext-price-big{font-size:13px;font-weight:700;color:#e6edf3;font-family:'SF Mono',monospace;letter-spacing:.3px}
-.ext-chg{font-size:10px;font-weight:600}
-.chg-up{color:#00d4a0}.chg-dn{color:#ff4d6d}
-.ext-card-bot{margin-top:5px;display:flex;align-items:center;gap:6px}
-.ext-conf-bar{flex:1;height:1px;background:#1a2030;border-radius:1px}
-.ext-conf-fill{height:100%;border-radius:1px}
-.ext-conf-lbl{font-size:8px;color:#3a4555;white-space:nowrap}
-
-#marketsPanel::-webkit-scrollbar{width:3px}
-#marketsPanel::-webkit-scrollbar-track{background:#080c14}
-#marketsPanel::-webkit-scrollbar-thumb{background:#1a2535;border-radius:2px}
-.mkt-group{margin-bottom:24px}
-.mkt-group-hdr{font-size:8px;font-weight:900;letter-spacing:3px;color:#1e3a2f;text-transform:uppercase;padding:0 0 8px;border-bottom:1px solid #0d1f17;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.mkt-group-hdr.active{color:#00d4a0;border-bottom-color:#00d4a020}
-.mkt-card{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:2px 8px;padding:10px 12px;margin-bottom:3px;background:#0a0e1a;border:1px solid #10161f;border-radius:5px;cursor:pointer;transition:all .1s}
-.mkt-card:hover{background:#0d1420;border-color:#1e2d40}
-.mkt-card.mkt-buy{border-left:2px solid #00d4a0}
-.mkt-card.mkt-sell{border-left:2px solid #ff4d6d}
-.mkt-card.mkt-wait{border-left:2px solid #1a2535}
-.mkt-name{font-size:11px;font-weight:700;color:#c9d1d9;grid-column:1;grid-row:1}
-.mkt-sig{font-size:8px;font-weight:900;letter-spacing:1px;grid-column:2;grid-row:1;text-align:right;align-self:center}
-.mkt-sig.mkt-buy{color:#00d4a0}
-.mkt-sig.mkt-sell{color:#ff4d6d}
-.mkt-sig.mkt-wait{color:#2a3545}
-.mkt-price{font-size:13px;font-weight:700;color:#e6edf3;font-family:monospace;letter-spacing:.5px;grid-column:1;grid-row:2}
-.mkt-chg{font-size:10px;font-weight:600;grid-column:2;grid-row:2;text-align:right;align-self:end}
-.mkt-chg.up{color:#00d4a0}.mkt-chg.dn{color:#ff4d6d}
-.mkt-bar{grid-column:1/-1;height:1px;background:#10161f;margin-top:6px;border-radius:1px;overflow:hidden}
-.mkt-bar-fill{height:100%;border-radius:1px;transition:width .8s ease}
-
-
-.ext-section{border-top:1px solid var(--border)}
-.ext-tabs-bar{display:flex;gap:2px;padding:6px 8px;background:#070b12}
-.ext-tab-btn{flex:1;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:.5px;background:transparent;border:1px solid #1a2535;border-radius:3px;color:#3a4555;cursor:pointer;transition:all .15s}
-.ext-tab-btn.active{background:#00d4a015;border-color:#00d4a040;color:#00d4a0}
-.ext-tab-btn:hover{color:#8899aa;border-color:#2a3545}
-#extList{overflow-y:auto;max-height:calc(100vh - 320px)}
-#extList::-webkit-scrollbar{width:2px}
-#extList::-webkit-scrollbar-thumb{background:#1a2535}
-.ext-row{display:flex;align-items:center;padding:7px 10px;border-bottom:1px solid #0d1219;cursor:pointer;transition:background .1s}
-.ext-row:hover{background:#0d1420}
-.ext-row.active-row{background:#0d1a14;border-left:2px solid #00d4a0}
-.ext-row-name{flex:1;font-size:11px;font-weight:600;color:#8899aa}
-.ext-row-price{font-size:11px;font-weight:700;color:#c9d1d9;font-family:monospace;margin-right:6px}
-.ext-row-chg{font-size:9px;font-weight:600;min-width:42px;text-align:right;margin-right:6px}
-.ext-row-sig{font-size:8px;font-weight:800;letter-spacing:.5px;padding:1px 4px;border-radius:2px;min-width:28px;text-align:center}
-.ext-row-sig.buy{background:#00d4a020;color:#00d4a0}
-.ext-row-sig.sell{background:#ff4d6d20;color:#ff4d6d}
-.ext-row-sig.wait{color:#2a3545}
-
 </style>
 </head>
 <body>
@@ -499,17 +421,7 @@ canvas{position:absolute;top:0;left:0}
       <button class="sf-btn" onclick="sbFilter('SELL',this)">SELL</button>
       <button class="sf-btn" onclick="sbFilter('WAIT',this)">WAIT</button>
     </div>
-    <div class="pair-list" id="pairList" style="display:none"></div>
-    <div class="ext-section">
-        <div class="ext-tabs-bar">
-          <button class="ext-tab-btn active" onclick="switchExtTab('CRYPTO',this)">CRYPTO</button>
-          <button class="ext-tab-btn" onclick="switchExtTab('FOREX',this)">FX</button>
-          <button class="ext-tab-btn" onclick="switchExtTab('COMMODITIES',this)">COM</button>
-          <button class="ext-tab-btn" onclick="switchExtTab('INDICES',this)">IDX</button>
-          <button class="ext-tab-btn" onclick="switchExtTab('STOCKS',this)">STK</button>
-        </div>
-        <div id="extList"></div>
-      </div>
+    <div class="pair-list" id="pairList"></div>
   </div>
 
   <!-- CENTER -->
@@ -685,12 +597,10 @@ window.addEventListener("DOMContentLoaded", () => {
   setInterval(checkServer, 8000);
   setInterval(fetchTickers, 7000);
   setInterval(() => fetchCandles(S.pair, S.tf), 25000);
-  setInterval(fetchExtTickers, 30000);
   setInterval(() => runMTF(), 10000);
   window.addEventListener("resize", () => drawCandles(S.candles));
   document.getElementById("pairCnt");
   selectPair("BTCUSDT");
-  setTimeout(()=>{fetchExtTickers();renderExtTab("CRYPTO");}, 1000);
 });
 
 // ── CLOCK ──
@@ -1043,7 +953,7 @@ function updatePatterns(pair){
 
 function renderSR(pair){
   const sr=S.srData[pair];if(!sr)return;
-  const price=S.tickers[pair]?.price||S.tickers[pair]?.lastPrice||r.entry||0;
+  const price=S.tickers[pair]?.price||0;
   document.getElementById("srBlock").style.display="block";
   document.getElementById("srRes").innerHTML=sr.resistance?.length?sr.resistance.map(r=>`<div class="sr-lvl res"><span>$${r.toLocaleString(undefined,{maximumFractionDigits:4})}</span><span class="sr-dist">${price?((r-price)/price*100).toFixed(2)+"%":""}</span></div>`).join(""):"<div style='font-size:9px;color:var(--text3);padding:2px'>Sin datos</div>";
   document.getElementById("srSup").innerHTML=sr.support?.length?sr.support.map(s=>`<div class="sr-lvl sup"><span>$${s.toLocaleString(undefined,{maximumFractionDigits:4})}</span><span class="sr-dist">${price?((price-s)/price*100).toFixed(2)+"%":""}</span></div>`).join(""):"<div style='font-size:9px;color:var(--text3);padding:2px'>Sin datos</div>";
@@ -1105,12 +1015,12 @@ function localAI(pair){
   if(hist>0)score+=1;else score-=1;
   if(ema9>ema21)score+=1;else score-=1;
   patterns.forEach(p=>{if(p.type==="bull")score+=1;else if(p.type==="bear")score-=1;});
-  const mtfBull = S.sigs[pair]?.mtf?.m5==="ALCISTA"&&S.sigs[pair]?.mtf?.m15
+  const sig=sconst mtfBull = S.sigs[pair]?.mtf?.m5==="ALCISTA"&&S.sigs[pair]?.mtf?.m15==="ALCISTA";
 const mtfBear = S.sigs[pair]?.mtf?.m5==="BAJISTA"&&S.sigs[pair]?.mtf?.m15==="BAJISTA";
 const sig = (score>=26&&mtfAlcista&&conf>=45)?"BUY":(score<=-26&&mtfBajista&&conf>=45)?"SELL":"WAIT";
 const dir=sig==="SELL"?"SELL":"BUY";
-const sl=S.sigs[pair]?.sl||(dir==="BUY"?price-atr*1.5:price+atr*1.5);
-const tp=S.sigs[pair]?.tp||(dir==="BUY"?price+atr*3:price-atr*3);
+const sl=dir==="BUY"?price-atr*1.5:price+atr*1.5;
+const tp=dir==="BUY"?price+atr*3:price-atr*3;
 const trail=dir==="BUY"?price-atr*2:price+atr*2;
   const cap=parseFloat(document.getElementById("inpCap").value)||1000;
   const risk=parseFloat(document.getElementById("inpRisk").value)||1;
@@ -1135,7 +1045,7 @@ function applyResult(r,pair){
   document.getElementById("aiStrength").innerHTML=str?`<span class="ai-strength str-${str}">${str}</span>`:"";
   document.getElementById("aiWhale").style.display=r.whale_alert?"block":"none";
 
-  const f=v=>"$"+parseFloat(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const f=v=>"$"+parseFloat(v).toLocaleString(undefined,{sed -i '' 's/if total >= 65:/if total >= 45:/' nexus_server_elite.pyimumFractionDigits:2,maximumFractionDigits:4});
   ["entry","sl","trail","tp","lot","rr"].forEach(k=>{
     const el=document.getElementById("lv"+k.charAt(0).toUpperCase()+k.slice(1));
     if(el)el.textContent=k==="lot"?(lot.toFixed(4)+" u"):k==="rr"?("1:"+parseFloat(rr).toFixed(1)):f(k==="trail"?trail:k==="sl"?sl:k==="tp"?tp:r.entry||price);
@@ -1174,7 +1084,7 @@ function applyResult(r,pair){
     renderSR(pair);
   }
 
-  S.sigs[pair]={signal:sig,confidence:conf,sl:t.sl,tp:t.tp};
+  S.sigs[pair]={signal:sig,confidence:conf};
   const pb=document.getElementById("pb_"+pair);if(pb){pb.textContent=sig;pb.className="badge "+sig;}
   if(sig!=="WAIT")showAlert(pair,sig);
 
@@ -1183,8 +1093,6 @@ function applyResult(r,pair){
   analyzeBtn.className="analyze-btn success";
   setTimeout(()=>{analyzeBtn.textContent="▶ ANALIZAR CON IA";analyzeBtn.className="analyze-btn";},4000);
 }
-setInterval(()=>{ runMTF(); setTimeout(()=>{ runAI(); }, 3000); }, 30000);
-setTimeout(()=>{ runMTF(); setTimeout(()=>{ runAI(); }, 3000); }, 2000);
 
 function clearAI(){
   ["lvEntry","lvSl","lvTrail","lvTp","lvLot","lvRr","mSl","mTrail","mTp","mLot","mRr"].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent="---";});
@@ -1203,75 +1111,12 @@ function clearAI(){
 }
 
 // ── ALERT ──
-
-async function fetchExtTickers(){
-  try{
-    const r=await fetch("http://localhost:5001/api/ext_tickers");
-    window._extData=await r.json();
-    renderExtTab(window._extTab||"CRYPTO");
-  }catch(e){console.error(e);}
+function showAlert(pair,signal){
+  const div=document.createElement("div");
+  div.className=`alert-flash ${signal}`;
+  div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
+  document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
 }
-function switchExtTab(tab,btn){
-  document.querySelectorAll(".ext-tab-btn").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-  window._extTab=tab;
-  renderExtTab(tab);
-}
-function renderExtTab(tab){
-  const nameMap={
-    "EURUSD":"EUR/USD","GBPUSD":"GBP/USD","USDJPY":"USD/JPY","AUDUSD":"AUD/USD",
-    "USDCHF":"USD/CHF","USDCAD":"USD/CAD","NZDUSD":"NZD/USD","EURGBP":"EUR/GBP",
-    "XAUUSD":"XAU/USD","XAGUSD":"XAG/USD","USOIL":"WTI/USD","UKOIL":"BRENT",
-    "NATGAS":"NAT/GAS","COPPER":"COPPER","WHEAT":"WHEAT","CORN":"CORN",
-    "SPX500":"SPX500","NAS100":"NAS100","DOW30":"DJ30","DAX40":"DAX40",
-    "FTSE100":"FTSE100","NIK225":"NK225","VIX":"VIX",
-    "AAPL":"AAPL","TSLA":"TSLA","NVDA":"NVDA","AMZN":"AMZN",
-    "MSFT":"MSFT","GOOGL":"GOOGL","META":"META","NFLX":"NFLX"
-  };
-  function fmtPrice(sym,p){
-    const fx=["EURUSD","GBPUSD","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP"];
-    if(fx.includes(sym))return p.toFixed(4);
-    if(sym==="USDJPY")return p.toFixed(2);
-    if(p>=10000)return p.toLocaleString("en-US",{maximumFractionDigits:0});
-    if(p>=100)return p.toFixed(2);
-    return p.toFixed(4);
-  }
-  const el=document.getElementById("extList");
-  if(!el)return;
-  if(tab==="CRYPTO"){
-    const pairs=["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","DOTUSDT","MATICUSDT","LINKUSDT","UNIUSDT","ATOMUSDT","LTCUSDT","ETCUSDT","XLMUSDT","NEARUSDT","ALGOUSDT","FTMUSDT","SANDUSDT","MANAUSDT","AAVEUSDT","SHIBUSDT","TRXUSDT"];
-    el.innerHTML=pairs.map(p=>{
-      const t=S.tickers[p]||{};
-      const price=parseFloat(t.lastPrice||0);
-      const chg=parseFloat(t.priceChangePercent||0);
-      const sig=S.sigs[p]?.signal||"WAIT";
-      const sigCls=sig==="BUY"?"buy":sig==="SELL"?"sell":"wait";
-      return `<div class="ext-row" onclick="selectPair('${p}')" style="cursor:pointer">
-        <span class="ext-row-name">${p.replace("USDT","")}</span>
-        <span class="ext-row-price">${price>0?price.toFixed(2):"—"}</span>
-        <span class="ext-row-chg" style="color:${chg>=0?"#00d4a0":"#ff4d6d"}">${chg>=0?"+":""}${chg.toFixed(2)}%</span>
-        <span class="ext-row-sig ${sigCls}">${sig}</span>
-      </div>`;
-    }).join("");
-    return;
-  }
-  const d=window._extData||{};
-  const items=Object.entries(d).filter(([s,i])=>i.category===tab);
-  if(!items.length){
-    el.innerHTML="<div style='padding:16px;color:#2a3545;text-align:center;font-size:10px'>Cargando datos...</div>";
-    return;
-  }
-  el.innerHTML=items.map(([sym,i])=>{
-    const sig=i.signal||"WAIT";
-    const chg=i.change||0;
-    const price=typeof i.price==="number"?fmtPrice(sym,i.price):"—";
-    const sigCls=sig==="BUY"?"buy":sig==="SELL"?"sell":"wait";
-    const name=nameMap[sym]||sym;
-    return `<div class="ext-row" onclick="selectExtAsset('${sym}','${name}',${i.price||0})" style="cursor:pointer">
-      <span class="ext-row-name">${name}</span>
-      <span class="ext-row-price">${price}</span>
-      <span class="ext-row-chg" style="color:${chg>=0?"#00d4a0":"#ff4d6d"}">${chg>=0?"+":""}${chg.toFixed(2)}%</span>
-      <span class="ext-row-sig ${sigCls}">${sig}</span>
-    </div>`;
-  }).join("");
-}
+</script>
+</body>
+</html>
