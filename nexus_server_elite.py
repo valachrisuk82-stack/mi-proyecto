@@ -731,7 +731,16 @@ def update_all():
         conf = ml["confidence"]
         prev = cache["last_alerts"].get(pair, {}).get("signal")
 
-        if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev:
+        mtf_ok = True
+        try:
+            _mtf = multi_tf_analysis(pair)
+            _ctxt = _mtf.get("confluence", "NEUTRAL")
+            _dir = (sig=="BUY" and "ALCISTA" in _ctxt) or (sig=="SELL" and "BAJISTA" in _ctxt)
+            if not _dir or _ctxt == "NEUTRAL":
+                mtf_ok = False
+        except:
+            mtf_ok = True
+        if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev and mtf_ok:
             price = float(cache["tickers"].get(pair, {}).get("lastPrice", 0))
             atr   = ind.get("atr", price * 0.012)
             sr    = ind.get("sr", {})
