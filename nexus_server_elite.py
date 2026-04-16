@@ -1,4 +1,3 @@
-import os
 """
 ╔══════════════════════════════════════════════════════════════════╗
 ║   NEXUS PRO ELITE — Servidor con ML + Trailing Stop             ║
@@ -12,7 +11,7 @@ EJECUTAR:
     python3 nexus_server_elite.py
 """
 
-from flask import send_file, Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import anthropic
 import requests
@@ -22,24 +21,23 @@ import json
 import time
 import threading
 import re
+import os
 from datetime import datetime
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import os
 
 # ══════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
-"anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
-    "telegram_token": "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
+    "anthropic_api_key": "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",
+    "telegram_token":    "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
     "risk_pct":          1.0,
     "kline_tf":          "5m",
     "kline_limit":       200,
     "refresh_sec":       30,
-    "min_confidence":    55,
+    "min_confidence":    72,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
 
@@ -51,126 +49,39 @@ PAIRS = [
     "MANAUSDT","AAVEUSDT","SHIBUSDT","TRXUSDT",
 ]
 
-FOREX_PAIRS = {"EURUSD":"EURUSD=X","GBPUSD":"GBPUSD=X","USDJPY":"JPY=X","AUDUSD":"AUDUSD=X","USDCHF":"CHF=X","USDCAD":"CAD=X","NZDUSD":"NZDUSD=X","EURGBP":"EURGBP=X"}
-COMMODITIES = {"XAUUSD":"GC=F","XAGUSD":"SI=F","USOIL":"CL=F","UKOIL":"BZ=F","NATGAS":"NG=F","COPPER":"HG=F","WHEAT":"ZW=F","CORN":"ZC=F"}
-INDICES     = {"SPX500":"^GSPC","NAS100":"^IXIC","DOW30":"^DJI","DAX40":"^GDAXI","FTSE100":"^FTSE","NIK225":"^N225","VIX":"^VIX"}
-STOCKS      = {"AAPL":"AAPL","TSLA":"TSLA","NVDA":"NVDA","AMZN":"AMZN","MSFT":"MSFT","GOOGL":"GOOGL","META":"META","NFLX":"NFLX"}
-ALL_EXTERNAL = {**FOREX_PAIRS,**COMMODITIES,**INDICES,**STOCKS}
-
 BASE = "https://api.binance.com/api/v3"
 
 # ══════════════════════════════════════════════════════════════════
 #  TELEGRAM
 # ══════════════════════════════════════════════════════════════════
-def send_telegram(message, reply_markup=None):
+def send_telegram(message):
     try:
         token   = CONFIG["telegram_token"]
         chat_id = CONFIG["telegram_chat_id"]
         if "TU_API" in token: return
-        url  = f"https://api.telegram.org/bot{token}/sendMessage"
-        body = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
-        if reply_markup:
-            body["reply_markup"] = reply_markup
-        requests.post(url, json=body, timeout=5)
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
     except: pass
-
-def send_telegram_photo(photo_url, caption):
-    try:
-        token   = CONFIG["telegram_token"]
-        chat_id = CONFIG["telegram_chat_id"]
-        if "TU_API" in token: return
-        url = f"https://api.telegram.org/bot{token}/sendPhoto"
-        requests.post(url, json={"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "HTML"}, timeout=5)
-    except: pass
-
-def daily_summary():
-    """Envía resumen diario a las 08:00 London"""
-    while True:
-        now = datetime.now()
-        if now.hour == 8 and now.minute == 0:
-            try:
-                signals = cache.get("history", [])[:20]
-                buys    = sum(1 for s in signals if s.get("signal") == "BUY")
-                sells   = sum(1 for s in signals if s.get("signal") == "SELL")
-                top     = sorted(signals, key=lambda x: x.get("confidence", 0), reverse=True)[:3]
-                top_str = ""
-                for s in top:
-                    e = "🟢" if s["signal"] == "BUY" else "🔴"
-                    top_str += f"  {e} {s['pair']} — {s['signal']} {s['confidence']}% @ ${s['price']:.4f}\n"
-                fgi = cache.get("fgi", {})
-                fgi_emoji = "😱" if fgi.get("value",50) < 25 else "😰" if fgi.get("value",50) < 45 else "😐" if fgi.get("value",50) < 55 else "😊" if fgi.get("value",50) < 75 else "🤑"
-                msg = f"""
-🌅 <b>NEXUS APEX — RESUMEN DIARIO</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-📅 {now.strftime('%A %d %B %Y')} | London
-{fgi_emoji} Fear & Greed: <b>{fgi.get('value',50)} — {fgi.get('label','Neutral')}</b>
-
-📊 <b>SEÑALES ÚLTIMAS HORAS:</b>
-  🟢 BUY:  <b>{buys}</b> señales
-  🔴 SELL: <b>{sells}</b> señales
-
-🏆 <b>TOP SEÑALES:</b>
-{top_str}
-━━━━━━━━━━━━━━━━━━━━━━━━
-🤖 NEXUS APEX está activo y monitorizando {len(PAIRS)} pares
-💡 Usa /status para ver el estado en tiempo real"""
-                send_telegram(msg)
-            except Exception as e:
-                print(f"[ERROR] daily_summary: {e}")
-            time.sleep(61)
-        else:
-            time.sleep(30)
 
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
-    emoji      = "🟢" if signal == "BUY" else "🔴"
+    emoji = "🟢" if signal == "BUY" else "🔴"
     sent_emoji = "😊" if news_sent > 0 else "😰" if news_sent < 0 else "😐"
-    conf_bar   = "█" * (conf // 10) + "░" * (10 - conf // 10)
-    ml_bar     = "█" * (ml_score // 10) + "░" * (10 - ml_score // 10)
-    risk_usd   = round(CONFIG["capital"] * CONFIG["risk_pct"] / 100, 2)
-    pot_profit = round(risk_usd * rr, 2)
-    direction  = "LARGO 📈" if signal == "BUY" else "CORTO 📉"
-    sent_label = "POSITIVO" if news_sent > 0 else "NEGATIVO" if news_sent < 0 else "NEUTRAL"
-    now        = datetime.now().strftime("%H:%M:%S")
-    date       = datetime.now().strftime("%d/%m/%Y")
     return f"""
-{emoji}<b>NEXUS APEX — SEÑAL {signal}</b> {emoji}
-┌─────────────────────────┐
-│  {pair:<10}  {direction}
-│  🕐 {now}  📅 {date}
-└─────────────────────────┘
-
-💰 <b>NIVELES DE PRECIO</b>
-  ┣ Entrada:      <b>${entry:,.5f}</b>
-  ┣ Stop Loss:    <b>${sl:,.5f}</b>  🛑
-  ┣ Trailing SL:  <b>${trail_sl:,.5f}</b>  🔄
-  ┗ Take Profit:  <b>${tp:,.5f}</b>  🎯
-
-⚖️ <b>GESTIÓN DE RIESGO</b>
-  ┣ Ratio R:R:    <b>1:{rr}</b>
-  ┣ Riesgo:       <b>${risk_usd} USDT</b>
-  ┗ Potencial:    <b>+${pot_profit} USDT</b>
-
-🤖 <b>ANÁLISIS IA</b>
-  ┣ Confianza:  <b>{conf}%</b>  [{conf_bar}]
-  ┣ Score ML:   <b>{ml_score}/100</b>  [{ml_bar}]
-  ┗ Sentimiento: {sent_emoji} <b>{sent_label}</b>
-
-💬 <i>{reasoning}</i>
-
-<b>⚡ NEXUS APEX</b> | London 🇬🇧"""
-
-def tg_alert_markup(pair, signal):
-    """Botones interactivos para la alerta"""
-    coin = pair.replace("USDT","")
-    return {
-        "inline_keyboard": [[
-            {"text": "📊 Ver Chart", "url": f"https://www.tradingview.com/chart/?symbol=BINANCE:{pair}"},
-            {"text": "⚡ Binance", "url": f"https://www.binance.com/en/trade/{coin}_USDT"},
-        ],[
-            {"text": "✅ Tomada", "callback_data": f"taken_{pair}_{signal}"},
-            {"text": "❌ Ignorada", "callback_data": f"skip_{pair}_{signal}"},
-        ]]
-    }
+{emoji} <b>NEXUS PRO ELITE — {signal}</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Par: <b>{pair}</b>
+💰 Entrada: <b>${entry:,.4f}</b>
+🛑 Stop Loss: <b>${sl:,.4f}</b>
+🔄 Trailing SL: <b>${trail_sl:,.4f}</b>
+🎯 Take Profit: <b>${tp:,.4f}</b>
+⚖️ R:R: <b>1:{rr}</b>
+🤖 Confianza IA: <b>{conf}%</b>
+🧠 Score ML: <b>{ml_score}/100</b>
+{sent_emoji} Sentimiento: <b>{'POSITIVO' if news_sent > 0 else 'NEGATIVO' if news_sent < 0 else 'NEUTRAL'}</b>
+━━━━━━━━━━━━━━━━━━━━━━━━
+💬 {reasoning}
+🕐 {datetime.now().strftime('%H:%M:%S')} London
+"""
 
 # ══════════════════════════════════════════════════════════════════
 #  BINANCE API
@@ -231,50 +142,6 @@ def get_orderbook_deep(symbol, limit=100):
         }
     except:
         return {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
-
-def get_yahoo_klines(symbol, yf_ticker, tf="5m"):
-    import time
-    cache_key = f"{symbol}_{tf}"
-    now = time.time()
-    if cache_key in _klines_cache and now - _klines_cache_time.get(cache_key, 0) < KLINES_TTL:
-        return _klines_cache[cache_key]
-    result = _get_yahoo_klines_raw(symbol, yf_ticker, tf)
-    if not result.empty:
-        _klines_cache[cache_key] = result
-        _klines_cache_time[cache_key] = now
-    return result
-
-def _get_yahoo_klines_raw(symbol, yf_ticker, tf="5m"):
-    try:
-        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
-        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
-        yf_tf  = tf_map.get(tf, "5m")
-        period = per_map.get(yf_tf, "5d")
-        url    = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
-        r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
-        chart = r.json()["chart"]["result"][0]
-        ts = chart.get("timestamp") or chart.get("indicators",{}).get("quote",[{}])[0].get("timestamp", [])
-        q  = chart["indicators"]["quote"][0]
-        df = pd.DataFrame({"time":pd.to_datetime(ts,unit="s"),"open":q["open"],"high":q["high"],"low":q["low"],"close":q["close"],"volume":[x or 0 for x in q.get("volume",[0]*len(ts))]}).dropna()
-        df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
-        return df
-    except Exception as e:
-        print(f"[ERROR] Yahoo klines {symbol}: {e}")
-        return pd.DataFrame()
-
-def get_yahoo_price(symbol, yf_ticker):
-    try:
-        url  = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
-        r    = requests.get(url, params={"interval":"1m","range":"1d"}, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
-        meta = r.json()["chart"]["result"][0]["meta"]
-        price = float(meta.get("regularMarketPrice", 0))
-        prev  = float(meta.get("previousClose", price) or price)
-        chg   = ((price - prev) / prev * 100) if prev else 0
-        return {"lastPrice":str(round(price,4)),"priceChangePercent":str(round(chg,2)),"highPrice":str(meta.get("regularMarketDayHigh",price)),"lowPrice":str(meta.get("regularMarketDayLow",price)),"volume":str(meta.get("regularMarketVolume",0))}
-    except Exception as e:
-        print(f"[ERROR] Yahoo price {symbol}: {e}")
-        return {}
-
 
 def get_fear_greed():
     try:
@@ -538,110 +405,11 @@ ml_scorer = MLScorer()
 # ══════════════════════════════════════════════════════════════════
 #  TRAILING STOP
 # ══════════════════════════════════════════════════════════════════
-def find_swing_levels(df, lookback=20):
-    """Detecta swing highs y lows reales de las últimas velas"""
-    if len(df) < lookback: return None, None
-    recent = df.iloc[-lookback:]
-    swing_high = float(recent["high"].max())
-    swing_low  = float(recent["low"].min())
-    # Refinar: buscar el swing más reciente significativo
-    for i in range(len(recent)-1, max(len(recent)-8, 0), -1):
-        h = float(recent["high"].iloc[i])
-        l = float(recent["low"].iloc[i])
-        if h >= swing_high * 0.999:
-            swing_high = h
-            break
-    for i in range(len(recent)-1, max(len(recent)-8, 0), -1):
-        l = float(recent["low"].iloc[i])
-        if l <= swing_low * 1.001:
-            swing_low = l
-            break
-    return swing_high, swing_low
-
-def calc_precise_sl_tp(signal, price, atr, sr, bb, ob, df=None):
-    """SL/TP institucional cruzando SR, Fibonacci, ATR y orderbook"""
-    supports    = sorted(sr.get("support", []), reverse=True)
-    resistances = sorted(sr.get("resistance", []))
-    bb_width    = bb.get("width", 5) / 100
-    vol_mult    = 1.0 + (bb_width * 2)
-    atr_adj     = atr * vol_mult
-
-    # Swing levels reales del dataframe M5
-    swing_high_real, swing_low_real = (None, None)
-    if df is not None and not df.empty:
-        swing_high_real, swing_low_real = find_swing_levels(df, lookback=20)
-
-    # Fibonacci del rango reciente
-    if swing_high_real and swing_low_real:
-        swing_high = swing_high_real
-        swing_low  = swing_low_real
-    elif supports and resistances:
-        swing_low  = supports[-1]  if supports  else price * 0.97
-        swing_high = resistances[-1] if resistances else price * 1.03
-        fib_range  = swing_high - swing_low
-        fib_382    = swing_high - fib_range * 0.382
-        fib_500    = swing_high - fib_range * 0.500
-        fib_618    = swing_high - fib_range * 0.618
-    else:
-        fib_382 = price * 0.985
-        fib_500 = price * 0.975
-        fib_618 = price * 0.965
-
-    # Liquidez orderbook — nivel de ballenas
-    whale_bid = ob.get("whale_bids", 0)
-    whale_ask = ob.get("whale_asks", 0)
-
-    if signal == "BUY":
-        # SL: soporte más cercano debajo del precio O ATR ajustado
-        sl_sr  = max([s for s in supports if s < price * 0.999], default=None)
-        sl_atr = price - atr_adj * 1.5
-        sl_fib = fib_618 if fib_618 < price else fib_500
-
-        # Tomar el más conservador (más cercano) pero con mínimo 0.8x ATR
-        candidates = [x for x in [sl_sr, sl_atr, sl_fib] if x and x < price]
-        sl = max(candidates) if candidates else price - atr_adj * 1.5
-        sl = min(sl, price - atr * 0.8)  # mínimo buffer
-
-        # TP: resistencia más cercana O Fibonacci O 2xRiesgo mínimo
-        risk      = price - sl
-        tp_min    = price + risk * 2.0   # R:R mínimo 1:2
-        tp_sr     = min([r for r in resistances if r > price * 1.001], default=None)
-        tp_fib    = fib_382 if fib_382 > price else price + risk * 2.5
-
-        candidates_tp = [x for x in [tp_sr, tp_fib] if x and x > tp_min * 0.95]
-        tp = max(candidates_tp) if candidates_tp else tp_min
-
-        # Ajuste por ballenas — si hay presión compradora fuerte, TP más ambicioso
-        if whale_bid > whale_ask * 1.5:
-            tp = tp * 1.015
-
-    else:  # SELL
-        sl_sr  = min([r for r in resistances if r > price * 1.001], default=None)
-        sl_atr = price + atr_adj * 1.5
-        sl_fib = fib_382 if fib_382 > price else fib_500
-
-        candidates = [x for x in [sl_sr, sl_atr, sl_fib] if x and x > price]
-        sl = min(candidates) if candidates else price + atr_adj * 1.5
-        sl = max(sl, price + atr * 0.8)
-
-        risk      = sl - price
-        tp_min    = price - risk * 2.0
-        tp_sr     = max([s for s in supports if s < price * 0.999], default=None)
-        tp_fib    = fib_618 if fib_618 < price else price - risk * 2.5
-
-        candidates_tp = [x for x in [tp_sr, tp_fib] if x and x < tp_min * 1.05]
-        tp = min(candidates_tp) if candidates_tp else tp_min
-
-        if whale_ask > whale_bid * 1.5:
-            tp = tp * 0.985
-
-    rr = round(abs(tp - price) / abs(price - sl), 2) if abs(price - sl) > 0 else 2.0
-    return round(sl, 6), round(tp, 6), rr
-
 def calc_trailing_stop(signal, entry, current_price, atr):
     """Calcula trailing stop dinámico basado en ATR"""
     mult = CONFIG["trailing_atr_mult"]
     if signal == "BUY":
+        # Trail stop sube con el precio
         initial_sl = entry - atr * 1.5
         trail_sl   = current_price - atr * mult
         active_sl  = max(initial_sl, trail_sl)
@@ -681,12 +449,6 @@ def multi_tf_analysis(symbol):
 # ══════════════════════════════════════════════════════════════════
 #  CACHE
 # ══════════════════════════════════════════════════════════════════
-
-# Cache para klines externos
-_klines_cache = {}
-_klines_cache_time = {}
-KLINES_TTL = 60  # segundos
-
 cache = {
     "tickers":    {},
     "indicators": {},
@@ -697,92 +459,53 @@ cache = {
     "history":    [],
     "last_update":None,
     "updating":   False,
-    "last_alerts":{},"ext_tickers":{},
+    "last_alerts":{},
 }
-
-def process_pair(pair):
-    try:
-        df   = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
-        if df.empty: return pair, None
-        ind  = calc_all_indicators(df)
-        ob   = get_orderbook_deep(pair)
-        news = cache["news"].get(pair, {"score":0})
-        ml   = ml_scorer.score(ind, ob, news.get("score",0))
-        return pair, {"ind": ind, "ob": ob, "ml": ml, "news": news}
-    except Exception as e:
-        print(f"  ✗ {pair}: {e}")
-        return pair, None
 
 def update_all():
     if cache["updating"]: return
     cache["updating"] = True
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Actualizando NEXUS ELITE (paralelo)...")
-
-    with ThreadPoolExecutor(max_workers=2) as meta_pool:
-        f_tickers = meta_pool.submit(get_all_tickers)
-        f_fgi     = meta_pool.submit(get_fear_greed)
-        tickers   = f_tickers.result()
-        fgi       = f_fgi.result()
-
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Actualizando NEXUS ELITE...")
+    tickers = get_all_tickers()
     if tickers: cache["tickers"] = tickers
-    cache["fgi"] = fgi
+    cache["fgi"] = get_fear_greed()
 
-    results = {}
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(process_pair, pair): pair for pair in PAIRS}
-        for future in as_completed(futures):
-            pair, data = future.result()
-            if data:
-                results[pair] = data
-
-    for pair, data in results.items():
-        ind  = data["ind"]
-        ob   = data["ob"]
-        ml   = data["ml"]
-        news = data["news"]
-
-        cache["indicators"][pair] = ind
-        cache["orderflow"][pair]  = ob
-        cache["signals"][pair]    = ml
-
-        sig  = ml["signal"]
-        conf = ml["confidence"]
-        prev = cache["last_alerts"].get(pair, {}).get("signal")
-
-        mtf_ok = True
+    for pair in PAIRS:
         try:
-            _mtf = multi_tf_analysis(pair)
-            _ctxt = _mtf.get("confluence", "NEUTRAL")
-            _dir = (sig=="BUY" and "ALCISTA" in _ctxt) or (sig=="SELL" and "BAJISTA" in _ctxt)
-            if not _dir or _ctxt == "NEUTRAL":
-                mtf_ok = False
-        except:
-            mtf_ok = True
-        if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev and mtf_ok:
-            price = float(cache["tickers"].get(pair, {}).get("lastPrice", 0))
-            atr   = ind.get("atr", price * 0.012)
-            sr    = ind.get("sr", {})
-            bb    = ind.get("bb", {})
-            df_m5 = get_klines(pair, "5m", 50)
-            sl, tp, _ = calc_precise_sl_tp(sig, price, atr, sr, bb, ob, df_m5)
-            trail = calc_trailing_stop(sig, price, price, atr)
-            msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail,
-                             "Señal ML automática", ml["ml_score"], news.get("score",0))
-            send_telegram(msg, reply_markup=tg_alert_markup(pair, sig))
-            cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
-            cache["history"].insert(0, {
-                "time": datetime.now().strftime("%H:%M:%S"),
-                "pair": pair, "signal": sig, "confidence": conf,
-                "price": round(price, 4), "ml_score": ml["ml_score"], "source": "AUTO"
-            })
-            if len(cache["history"]) > 100:
-                cache["history"] = cache["history"][:100]
+            df  = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
+            if df.empty: continue
+            ind = calc_all_indicators(df)
+            ob  = get_orderbook_deep(pair)
+            news = cache["news"].get(pair, {"score":0})
+            ml  = ml_scorer.score(ind, ob, news.get("score",0))
+            cache["indicators"][pair] = ind
+            cache["orderflow"][pair]  = ob
+            cache["signals"][pair]    = ml
 
-        print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
+            sig  = ml["signal"]
+            conf = ml["confidence"]
+            prev = cache["last_alerts"].get(pair,{}).get("signal")
+
+            if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
+                price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
+                atr   = ind.get("atr", price*0.012)
+                sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
+                tp    = price + atr*3   if sig=="BUY" else price - atr*3
+                trail = calc_trailing_stop(sig, price, price, atr)
+                msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
+                send_telegram(msg)
+                cache["last_alerts"][pair] = {"signal":sig,"time":datetime.now()}
+                cache["history"].insert(0,{"time":datetime.now().strftime("%H:%M:%S"),"pair":pair,"signal":sig,"confidence":conf,"price":round(price,4),"ml_score":ml["ml_score"],"source":"AUTO"})
+                if len(cache["history"])>100: cache["history"]=cache["history"][:100]
+
+            print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
+            time.sleep(0.25)
+        except Exception as e:
+            print(f"  ✗ {pair}: {e}")
 
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
-    print(f"[OK] Elite update complete — {cache['last_update']} ({len(results)}/{len(PAIRS)} pares)")
+    print(f"[OK] Elite update complete — {cache['last_update']}")
 
 def news_updater():
     """Actualiza noticias cada 5 minutos"""
@@ -793,36 +516,6 @@ def news_updater():
                 time.sleep(2)
             except: pass
         time.sleep(300)
-
-def update_external():
-    """Actualiza activos externos en thread separado cada 60 segundos"""
-    while True:
-        for symbol, yf_ticker in ALL_EXTERNAL.items():
-            try:
-                pd_data = get_yahoo_price(symbol, yf_ticker)
-                if pd_data: cache["ext_tickers"][symbol] = pd_data
-                df = get_yahoo_klines(symbol, yf_ticker)
-                if df.empty or len(df) < 20: continue
-                ind = calc_all_indicators(df)
-                ob  = {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
-                ml  = ml_scorer.score(ind, ob, 0)
-                cache["indicators"][symbol] = ind
-                cache["signals"][symbol]    = ml
-                sig  = ml["signal"]; conf = ml["confidence"]
-                prev = cache["last_alerts"].get(symbol,{}).get("signal")
-                if sig in ["BUY","SELL"] and conf >= CONFIG["min_confidence"] and sig != prev:
-                    price = float(pd_data.get("lastPrice",0))
-                    atr   = ind.get("atr", price*0.005)
-                    sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-                    tp    = price + atr*3   if sig=="BUY" else price - atr*3
-                    trail = calc_trailing_stop(sig, price, price, atr)
-                    msg   = tg_alert(symbol, sig, conf, price, sl, tp, 2.0, trail, "Señal ML", ml["ml_score"], 0)
-                    send_telegram(msg)
-                    cache["last_alerts"][symbol] = {"signal":sig,"time":datetime.now()}
-                print(f"  ✓ {symbol}: ML={ml['ml_score']} → {sig} ({conf}%)")
-            except Exception as e:
-                print(f"  ✗ {symbol}: {e}")
-        time.sleep(60)
 
 def bg_updater():
     while True:
@@ -991,15 +684,10 @@ def indicators(symbol):
 
 @app.route("/api/klines/<symbol>")
 def klines(symbol):
-    sym   = symbol.upper()
     tf    = request.args.get("tf", CONFIG["kline_tf"])
     limit = int(request.args.get("limit",120))
-    if sym in ALL_EXTERNAL:
-        df = get_yahoo_klines(sym, ALL_EXTERNAL[sym], tf)
-    else:
-        df = get_klines(sym, tf, limit)
+    df = get_klines(symbol.upper(), tf, limit)
     if df.empty: return jsonify([])
-    df = df.tail(limit)
     return jsonify(df[["time","open","high","low","close","volume"]].assign(
         time=df["time"].astype(str)).to_dict(orient="records"))
 
@@ -1022,30 +710,6 @@ def mtf(symbol):
 @app.route("/api/history")
 def history():
     return jsonify(cache["history"])
-
-
-@app.route("/api/ext_tickers")
-def ext_tickers():
-    CAT_MAP = {}
-    for s in FOREX_PAIRS:  CAT_MAP[s] = "FOREX"
-    for s in COMMODITIES:  CAT_MAP[s] = "COMMODITIES"
-    for s in INDICES:      CAT_MAP[s] = "INDICES"
-    for s in STOCKS:       CAT_MAP[s] = "STOCKS"
-    result = {}
-    for symbol in ALL_EXTERNAL:
-        t  = cache["ext_tickers"].get(symbol, {})
-        ml = cache["signals"].get(symbol, {"signal":"SCAN","confidence":0,"ml_score":0})
-        result[symbol] = {
-            "price":float(t.get("lastPrice",0) or 0),
-            "category": CAT_MAP.get(symbol, "FOREX"),
-            "change":float(t.get("priceChangePercent",0) or 0),
-            "high":float(t.get("highPrice",0) or 0),
-            "low":float(t.get("lowPrice",0) or 0),
-            "signal":ml.get("signal","SCAN"),
-            "confidence":ml.get("confidence",0),
-            "ml_score":ml.get("ml_score",0),
-        }
-    return jsonify(result)
 
 @app.route("/api/news/<symbol>")
 def news(symbol):
@@ -1122,7 +786,6 @@ print(f"  Telegram:  {'✅' if 'TU_API' not in CONFIG['telegram_token'] else '�
 print("═"*58)
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
-threading.Thread(target=update_external, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 print("\n  ✅ Servidor listo en http://localhost:5001")
 print("  → Abre nexus_elite.html en tu navegador\n")
