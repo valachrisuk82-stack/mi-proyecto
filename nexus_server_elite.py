@@ -685,10 +685,16 @@ def indicators(symbol):
 
 @app.route("/api/klines/<symbol>")
 def klines(symbol):
+    sym   = symbol.upper()
     tf    = request.args.get("tf", CONFIG["kline_tf"])
     limit = int(request.args.get("limit",120))
-    df = get_klines(symbol.upper(), tf, limit)
+    if sym in ALL_EXTERNAL:
+        yf_ticker = ALL_EXTERNAL[sym]["ticker"]
+        df = get_yahoo_klines_simple(yf_ticker, tf)
+    else:
+        df = get_klines(sym, tf, limit)
     if df.empty: return jsonify([])
+    df = df.tail(limit)
     return jsonify(df[["time","open","high","low","close","volume"]].assign(
         time=df["time"].astype(str)).to_dict(orient="records"))
 
@@ -834,6 +840,123 @@ def login():
         return jsonify({"ok":True,"token":f"{p64}.{sig}","user":{"id":user[0],"username":user[1],"email":user[2],"plan":user[3]}})
     except Exception as e:
         return jsonify({"ok":False,"error":str(e)}),500
+
+
+# ══ ACTIVOS EXTERNOS (Yahoo Finance) ══
+ALL_EXTERNAL = {
+    "EURUSD":{"ticker":"EURUSD=X","cat":"FOREX"},
+    "GBPUSD":{"ticker":"GBPUSD=X","cat":"FOREX"},
+    "USDJPY":{"ticker":"USDJPY=X","cat":"FOREX"},
+    "AUDUSD":{"ticker":"AUDUSD=X","cat":"FOREX"},
+    "USDCHF":{"ticker":"USDCHF=X","cat":"FOREX"},
+    "USDCAD":{"ticker":"USDCAD=X","cat":"FOREX"},
+    "NZDUSD":{"ticker":"NZDUSD=X","cat":"FOREX"},
+    "EURGBP":{"ticker":"EURGBP=X","cat":"FOREX"},
+    "XAUUSD":{"ticker":"GC=F","cat":"COMMODITIES"},
+    "XAGUSD":{"ticker":"SI=F","cat":"COMMODITIES"},
+    "USOIL": {"ticker":"CL=F","cat":"COMMODITIES"},
+    "UKOIL": {"ticker":"BZ=F","cat":"COMMODITIES"},
+    "NATGAS":{"ticker":"NG=F","cat":"COMMODITIES"},
+    "COPPER":{"ticker":"HG=F","cat":"COMMODITIES"},
+    "WHEAT": {"ticker":"ZW=F","cat":"COMMODITIES"},
+    "CORN":  {"ticker":"ZC=F","cat":"COMMODITIES"},
+    "SPX500":{"ticker":"^GSPC","cat":"INDICES"},
+    "NAS100":{"ticker":"^IXIC","cat":"INDICES"},
+    "DOW30": {"ticker":"^DJI","cat":"INDICES"},
+    "DAX40": {"ticker":"^GDAXI","cat":"INDICES"},
+    "FTSE100":{"ticker":"^FTSE","cat":"INDICES"},
+    "NIK225":{"ticker":"^N225","cat":"INDICES"},
+    "VIX":   {"ticker":"^VIX","cat":"INDICES"},
+    "AAPL":  {"ticker":"AAPL","cat":"STOCKS"},
+    "TSLA":  {"ticker":"TSLA","cat":"STOCKS"},
+    "NVDA":  {"ticker":"NVDA","cat":"STOCKS"},
+    "AMZN":  {"ticker":"AMZN","cat":"STOCKS"},
+    "MSFT":  {"ticker":"MSFT","cat":"STOCKS"},
+    "GOOGL": {"ticker":"GOOGL","cat":"STOCKS"},
+    "META":  {"ticker":"META","cat":"STOCKS"},
+    "NFLX":  {"ticker":"NFLX","cat":"STOCKS"},
+}
+
+def get_yahoo_price_simple(yf_ticker):
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+        r = requests.get(url, params={"interval":"1m","range":"1d"}, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
+        data = r.json()
+        meta = data["chart"]["result"][0]["meta"]
+        price = meta.get("regularMarketPrice", 0)
+        prev  = meta.get("previousClose", price)
+        change = round((price - prev) / prev * 100, 2) if prev else 0
+        high  = meta.get("regularMarketDayHigh", price)
+        low   = meta.get("regularMarketDayLow", price)
+        return {"price": round(price,4), "change": change, "high": round(high,4), "low": round(low,4)}
+    except:
+        return {"price": 0, "change": 0, "high": 0, "low": 0}
+
+def get_yahoo_klines_simple(yf_ticker, tf="5m"):
+    try:
+        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
+        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
+        yf_tf  = tf_map.get(tf,"5m")
+        period = per_map.get(yf_tf,"5d")
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
+        r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
+        data  = r.json()
+        chart = data["chart"]["result"][0]
+        ts = chart.get("timestamp") or []
+        if not ts: return pd.DataFrame()
+        q  = chart["indicators"]["quote"][0]
+        df = pd.DataFrame({
+            "time":  pd.to_datetime(ts, unit="s"),
+            "open":  q.get("open",  [0]*len(ts)),
+            "high":  q.get("high",  [0]*len(ts)),
+            "low":   q.get("low",   [0]*len(ts)),
+            "close": q.get("close", [0]*len(ts)),
+            "volume":[x or 0 for x in q.get("volume",[0]*len(ts))],
+        }).dropna()
+        df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
+        return df
+    except Exception as e:
+        print(f"[ERROR] Yahoo klines {yf_ticker}: {e}")
+        return pd.DataFrame()
+
+_ext_cache = {}
+_ext_cache_time = {}
+EXT_CACHE_TTL = 60
+
+@app.route("/api/ext_tickers")
+def ext_tickers():
+    result = {}
+    now = time.time()
+    for sym, info in ALL_EXTERNAL.items():
+        cache_key = f"ext_{sym}"
+        if cache_key in _ext_cache and now - _ext_cache_time.get(cache_key,0) < EXT_CACHE_TTL:
+            result[sym] = _ext_cache[cache_key]
+            continue
+        try:
+            pd_data = get_yahoo_price_simple(info["ticker"])
+            ml  = cache["signals"].get(sym, {"signal":"WAIT","confidence":50,"ml_score":50})
+            entry = {
+                "price":      pd_data["price"],
+                "change":     pd_data["change"],
+                "high":       pd_data["high"],
+                "low":        pd_data["low"],
+                "category":   info["cat"],
+                "signal":     ml.get("signal","WAIT"),
+                "confidence": ml.get("confidence",50),
+                "ml_score":   ml.get("ml_score",50),
+                "whale":      "NEUTRAL",
+                "news":       "NEUTRAL",
+            }
+            _ext_cache[cache_key] = entry
+            _ext_cache_time[cache_key] = now
+            result[sym] = entry
+        except:
+            result[sym] = {"price":0,"change":0,"category":info["cat"],"signal":"WAIT","confidence":50,"ml_score":50}
+    return jsonify(result)
+
+@app.route("/api/categories")
+def categories():
+    return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
 
 # ══════════════════════════════════════════════════════════════════
 #  ARRANQUE
