@@ -3,12 +3,6 @@
 ║   NEXUS PRO ELITE — Servidor con ML + Trailing Stop             ║
 ║   Order Flow + Noticias Crypto + Bloomberg Style                ║
 ╚══════════════════════════════════════════════════════════════════╝
-
-INSTALAR:
-    pip3 install flask flask-cors anthropic requests pandas numpy scikit-learn
-
-EJECUTAR:
-    python3 nexus_server_elite.py
 """
 
 from flask import Flask, jsonify, request, send_file
@@ -22,8 +16,12 @@ import time
 import threading
 import re
 import os
-from datetime import datetime
+import sqlite3
+import hashlib
+import secrets
+from datetime import datetime, timedelta
 from collections import deque
+from functools import wraps
 
 # ══════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN
@@ -634,14 +632,17 @@ JSON:
 # ══════════════════════════════════════════════════════════════════
 #  FLASK
 # ══════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
 app = Flask(__name__)
 CORS(app)
-
-
-@app.route("/")
-@app.route("/app")
-def serve_app():
-    return send_file("nexus_apex-FINAL.html")
 
 @app.route("/api/status")
 def status():
@@ -771,6 +772,68 @@ def calc_stats(trades, capital, curve):
         if dd>maxDD: maxDD=dd
     return {"total_return":round(tr,2),"final_equity":round(equity,2),"win_rate":round(wr,1),
             "profit_factor":round(pf,2),"max_drawdown":round(maxDD,1),"total_trades":len(trades)}
+
+
+@app.route("/")
+@app.route("/app")
+def serve_app():
+    return send_file("nexus_apex-FINAL.html")
+
+@app.route("/login")
+def serve_login():
+    return send_file("nexus_login.html")
+
+@app.route("/auth/register", methods=["POST"])
+def register():
+    try:
+        data = request.get_json()
+        username = data.get("username","").strip().lower()
+        email = data.get("email","").strip().lower()
+        password = data.get("password","")
+        if len(username)<3: return jsonify({"ok":False,"error":"Usuario muy corto"}),400
+        if "@" not in email: return jsonify({"ok":False,"error":"Email invalido"}),400
+        if len(password)<6: return jsonify({"ok":False,"error":"Password minimo 6 caracteres"}),400
+        conn = sqlite3.connect("nexus_users.db")
+        c = conn.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+        c.execute("SELECT id FROM users WHERE username=? OR email=?", (username, email))
+        if c.fetchone():
+            conn.close()
+            return jsonify({"ok":False,"error":"Usuario o email ya existe"}),400
+        import hashlib, json, base64
+        from datetime import timedelta
+        pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
+        c.execute("INSERT INTO users (username,email,password_hash,plan) VALUES (?,?,?,?)",(username,email,pw_hash,"free"))
+        uid = c.lastrowid
+        conn.commit(); conn.close()
+        payload = json.dumps({"user_id":uid,"plan":"free","exp":(datetime.now()+timedelta(days=30)).isoformat()})
+        p64 = base64.b64encode(payload.encode()).decode()
+        sig = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
+        return jsonify({"ok":True,"token":f"{p64}.{sig}","user":{"id":uid,"username":username,"email":email,"plan":"free"},"message":"Bienvenido!"})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}),500
+
+@app.route("/auth/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+        username = data.get("username","").strip().lower()
+        password = data.get("password","")
+        import hashlib, json, base64
+        from datetime import timedelta
+        conn = sqlite3.connect("nexus_users.db")
+        c = conn.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+        pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
+        c.execute("SELECT id,username,email,plan FROM users WHERE (username=? OR email=?) AND password_hash=?",(username,username,pw_hash))
+        user = c.fetchone(); conn.close()
+        if not user: return jsonify({"ok":False,"error":"Credenciales incorrectas"}),401
+        payload = json.dumps({"user_id":user[0],"plan":user[3],"exp":(datetime.now()+timedelta(days=30)).isoformat()})
+        p64 = base64.b64encode(payload.encode()).decode()
+        sig = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
+        return jsonify({"ok":True,"token":f"{p64}.{sig}","user":{"id":user[0],"username":user[1],"email":user[2],"plan":user[3]}})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}),500
 
 # ══════════════════════════════════════════════════════════════════
 #  ARRANQUE
