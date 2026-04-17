@@ -463,7 +463,31 @@ canvas{position:absolute;top:0;left:0}
       <span class="pnone">Sin patrones detectados</span>
     </div>
 
-    <!-- CHART -->
+    <!-- NEURO PANEL -->
+        <div id="neuroPsychPanel" style="background:linear-gradient(135deg,rgba(0,20,10,0.97),rgba(0,8,4,0.99));border-top:2px solid rgba(0,255,150,0.4);border-bottom:1px solid rgba(0,255,150,0.15);padding:6px 12px;display:flex;align-items:center;gap:10px;overflow-x:auto;flex-shrink:0;position:relative;">
+            <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,150,0.015) 2px,rgba(0,255,150,0.015) 4px);pointer-events:none;"></div>
+            <div style="font-size:8px;letter-spacing:3px;color:rgba(0,255,150,0.5);white-space:nowrap;font-family:monospace;flex-shrink:0;">◈ NEURO-PSI</div>
+            <div style="display:flex;gap:6px;flex:1;">
+                <div class="nc" id="n-miedo"><span>😨</span><span class="nl">MIEDO</span><div class="nb"><div class="nf" id="nf-miedo" style="background:#ff3344;"></div></div><span class="np" id="np-miedo">0%</span></div>
+                <div class="nc" id="n-codicia"><span>🤑</span><span class="nl">CODICIA</span><div class="nb"><div class="nf" id="nf-codicia" style="background:#ffaa00;"></div></div><span class="np" id="np-codicia">0%</span></div>
+                <div class="nc" id="n-dolor"><span>💔</span><span class="nl">DOLOR</span><div class="nb"><div class="nf" id="nf-dolor" style="background:#ff5577;"></div></div><span class="np" id="np-dolor">0%</span></div>
+                <div class="nc" id="n-trampa"><span>🪤</span><span class="nl">TRAMPA</span><div class="nb"><div class="nf" id="nf-trampa" style="background:#4488ff;"></div></div><span class="np" id="np-trampa">0%</span></div>
+                <div class="nc" id="n-memoria"><span>🧠</span><span class="nl">MEMORIA</span><div class="nb"><div class="nf" id="nf-memoria" style="background:#00ff96;"></div></div><span class="np" id="np-memoria">0%</span></div>
+                <div class="nc" id="n-consenso"><span>⚡</span><span class="nl">CONSENSO</span><div class="nb"><div class="nf" id="nf-consenso" style="background:#bb44ff;"></div></div><span class="np" id="np-consenso">0%</span></div>
+            </div>
+            <div id="neuroAlert" style="font-size:10px;color:rgba(0,255,150,0.85);font-family:monospace;white-space:nowrap;flex-shrink:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 8px rgba(0,255,150,0.6);">🧠 NEUTRAL</div>
+            <div style="flex-shrink:0;text-align:center;min-width:36px;"><div style="font-size:7px;color:rgba(0,255,150,0.35);letter-spacing:1px;">BOOST</div><div id="neuroBoost" style="font-family:monospace;font-size:15px;font-weight:700;color:#00ff96;text-shadow:0 0 12px #00ff96,0 0 24px rgba(0,255,150,0.4);">+0</div></div>
+        </div>
+        <style>
+        .nc{display:flex;align-items:center;gap:3px;background:rgba(0,255,150,0.03);border:1px solid rgba(0,255,150,0.1);border-radius:3px;padding:3px 5px;min-width:82px;flex-shrink:0;transition:all .3s;}
+        .nc.active{background:rgba(0,255,150,0.08);border-color:rgba(0,255,150,0.35);box-shadow:0 0 6px rgba(0,255,150,0.15),inset 0 0 6px rgba(0,255,150,0.05);}
+        .nl{font-size:7px;letter-spacing:1px;color:rgba(0,255,150,0.45);font-family:monospace;flex:1;}
+        .nb{width:28px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+        .nf{height:100%;width:0%;border-radius:2px;transition:width .7s cubic-bezier(.4,0,.2,1);filter:brightness(1.2);}
+        .np{font-size:8px;font-family:monospace;color:rgba(255,255,255,0.4);min-width:22px;text-align:right;}
+        </style>
+
+        <!-- CHART -->
     <div class="chart-wrap" id="chartWrap">
       <canvas id="candleCanvas"></canvas>
       <canvas id="overlayCanvas" style="pointer-events:none"></canvas>
@@ -1080,7 +1104,8 @@ async function runAI(){
   document.getElementById("aiSpin").style.display="inline-block";
   const pair=S.pair;let result;
   if(S.serverOk){
-    try{const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST"});const d=await r.json();if(d.ok)result=d.result;else throw new Error(d.error);}
+    try{const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST"});const d=await r.json();if(d.ok)result=d.result;else throw new Error(d.error);
+        if(result&&result.neurons) updateNeuroPanel(result);}
     catch(e){localAI(pair);done();return;}
   }else{localAI(pair);done();return;}
   if(result)applyResult(result,pair);
@@ -1204,6 +1229,73 @@ function showAlert(pair,signal){
   div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
   document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
 }
+
+function updateNeuroPanel(data) {
+    const neurons = data.neurons || {};
+    const boost = data.neuro_boost || 0;
+    const alert = data.neuro_alert || "🧠 Psicología: NEUTRAL";
+
+    const keys = ["miedo","codicia","dolor","trampa","memoria","consenso"];
+    keys.forEach(k => {
+        const val = neurons[k] || 0;
+        const pct = Math.round(val * 100);
+        const fill = document.getElementById("nf-" + k);
+        const pctEl = document.getElementById("np-" + k);
+        const chip = document.getElementById("n-" + k);
+        if(fill) fill.style.width = pct + "%";
+        if(pctEl) pctEl.textContent = pct + "%";
+        if(chip) {
+            if(val > 0.5) chip.classList.add("active");
+            else chip.classList.remove("active");
+        }
+    });
+
+    const boostEl = document.getElementById("neuroBoost");
+    if(boostEl) {
+        boostEl.textContent = (boost >= 0 ? "+" : "") + boost;
+        boostEl.style.color = boost > 0 ? "#00ff96" : boost < 0 ? "#ff4455" : "#888";
+        boostEl.style.textShadow = boost > 0
+            ? "0 0 12px #00ff96, 0 0 24px rgba(0,255,150,0.4)"
+            : boost < 0 ? "0 0 12px #ff4455, 0 0 24px rgba(255,68,85,0.4)"
+            : "none";
+    }
+
+    const alertEl = document.getElementById("neuroAlert");
+    if(alertEl) {
+        alertEl.textContent = alert;
+        alertEl.style.color = boost > 5
+            ? "rgba(0,255,150,0.9)"
+            : boost < -5 ? "rgba(255,100,100,0.9)"
+            : "rgba(0,255,150,0.6)";
+    }
+}
+
+// Auto-actualizar neuro cada 30s con datos del tickers
+function autoNeuroUpdate() {
+    const pair = S.currentPair || "BTCUSDT";
+    const rsi = S.indicators && S.indicators[pair] ? (S.indicators[pair].rsi || 50) : 50;
+    const mlScore = S.mlScores && S.mlScores[pair] ? S.mlScores[pair] : 50;
+
+    // Simular neuronas basadas en RSI y ML Score disponibles
+    const fear = Math.max(0, (35 - rsi) / 35);
+    const greed = Math.max(0, (rsi - 65) / 35);
+    const dolor = rsi < 25 ? 0.8 : 0;
+    const trampa = (rsi > 60 || rsi < 40) ? 0.5 : 0.1;
+    const consenso = Math.abs(rsi - 50) / 50;
+    const boost = Math.round((fear - greed) * 20 + (rsi < 25 ? 15 : 0));
+
+    updateNeuroPanel({
+        neurons: {miedo:fear, codicia:greed, dolor:dolor, trampa:trampa, memoria:0.1, consenso:consenso},
+        neuro_boost: boost,
+        neuro_alert: rsi < 30 ? "😨 MIEDO COLECTIVO — Oportunidad contraria detectada"
+                   : rsi > 70 ? "🤑 EUFORIA — Precaución máxima"
+                   : rsi < 25 ? "💔 CAPITULACIÓN — Suelo potencial"
+                   : "🧠 Psicología: NEUTRAL"
+    });
+}
+setInterval(autoNeuroUpdate, 5000);
+setTimeout(autoNeuroUpdate, 1000);
+
 </script>
 </body>
 </html>
