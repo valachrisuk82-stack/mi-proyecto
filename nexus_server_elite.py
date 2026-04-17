@@ -398,6 +398,131 @@ class MLScorer:
             "breakdown":  scores,
         }
 
+# ═══════════════════════════════════════════════════════
+#  NEUROPSYCHOLOGY ENGINE — 6 Neuronas del Mercado
+# ═══════════════════════════════════════════════════════
+def calc_neuro_psychology(ind, klines=None):
+    """
+    6 Neuronas Psicológicas que detectan el estado emocional del mercado.
+    Retorna boost al ML score y diagnóstico para Telegram.
+    """
+    rsi      = ind.get("rsi", 50)
+    volume   = ind.get("volume_ratio", 1.0)
+    macd     = ind.get("macd", 0)
+    macd_sig = ind.get("macd_signal", 0)
+    bb_pos   = ind.get("bb_position", 0.5)  # 0=banda baja, 1=banda alta
+    stoch    = ind.get("stoch_k", 50)
+    close    = ind.get("close", 0)
+    ema21    = ind.get("ema21", close)
+    ema50    = ind.get("ema50", close)
+
+    neurons = {}
+    boosts  = []
+    alerts  = []
+
+    # ── NEURONA 1: MIEDO COLECTIVO ─────────────────────────────────────────
+    # Pánico de la masa = oportunidad contraria
+    panic = rsi < 30 and volume > 2.0
+    fear_level = max(0, (35 - rsi) / 35)
+    if panic: fear_level = min(1.0, fear_level * 1.5)
+    neurons["miedo"] = round(fear_level, 2)
+    if panic:
+        boosts.append(+12)
+        alerts.append("😨 MIEDO COLECTIVO — La masa vende en pánico. Históricamente el mejor momento de compra.")
+    elif rsi < 25:
+        boosts.append(+18)
+        alerts.append("😱 PÁNICO EXTREMO — Capitulación detectada. Rebote inminente con alta probabilidad.")
+
+    # ── NEURONA 2: CODICIA / EUFORIA ───────────────────────────────────────
+    # Euforia = trampa para compradores tardíos
+    euphoria = rsi > 72 and volume > 1.8 and close > ema21
+    greed_level = max(0, (rsi - 60) / 40)
+    neurons["codicia"] = round(greed_level, 2)
+    if euphoria:
+        boosts.append(-10)
+        alerts.append("🤑 EUFORIA DETECTADA — Los latecomers están comprando el techo. Precaución máxima.")
+    elif rsi > 80:
+        boosts.append(-15)
+        alerts.append("🚨 SOBRECOMPRA EXTREMA — Mercado irracional alcista. Alta probabilidad de corrección.")
+
+    # ── NEURONA 3: CAPITULACIÓN (DOLOR MÁXIMO) ─────────────────────────────
+    # Dolor máximo del mercado = suelo potencial
+    bb_extreme_low = bb_pos < 0.08
+    cap_signal = bb_extreme_low and rsi < 35 and macd < macd_sig
+    cap_level = max(0, (0.2 - bb_pos) / 0.2) if bb_pos < 0.2 else 0
+    neurons["dolor"] = round(min(1.0, cap_level), 2)
+    if cap_signal:
+        boosts.append(+20)
+        alerts.append("💔 CAPITULACIÓN — Precio en banda inferior + RSI bajo. Suelo técnico y psicológico.")
+
+    # ── NEURONA 4: TRAMPA DEL MERCADO ──────────────────────────────────────
+    # Señal demasiado obvia = posible trampa
+    all_bull = (macd > macd_sig and rsi > 60 and close > ema21 and close > ema50 and volume > 1.5)
+    all_bear = (macd < macd_sig and rsi < 40 and close < ema21 and close < ema50 and volume > 1.5)
+    trap_level = 0.8 if (all_bull or all_bear) else 0.1
+    neurons["trampa"] = round(trap_level, 2)
+    if all_bull:
+        boosts.append(-8)
+        alerts.append("🪤 TRAMPA ALCISTA — Señal demasiado obvia. El mercado suele sorprender a la mayoría.")
+    elif all_bear:
+        boosts.append(-8)
+        alerts.append("🪤 TRAMPA BAJISTA — Todos ven la caída. Cuidado con el short squeeze.")
+
+    # ── NEURONA 5: MEMORIA DE PRECIO ───────────────────────────────────────
+    # Niveles psicológicos redondos actúan como soporte/resistencia
+    psych_levels = [1000,5000,10000,20000,25000,30000,40000,50000,
+                    60000,65000,70000,75000,80000,100000,
+                    1000,1500,2000,2500,3000,3500,4000,
+                    0.5,1.0,1.5,2.0,5.0,10.0,
+                    1800,1900,2000,2100,2200,2300,2400,2500,
+                    4000,4500,5000,5500,6000,
+                    1.0,1.05,1.1,1.15,1.2]
+    near_level = any(abs(close - l) / (close or 1) < 0.008 for l in psych_levels if l > 0)
+    neurons["memoria"] = 0.85 if near_level else 0.1
+    if near_level:
+        boosts.append(+5)
+        alerts.append("🧠 NIVEL PSICOLÓGICO — Precio en zona de memoria colectiva. Alta reactividad esperada.")
+
+    # ── NEURONA 6: ANTI-CONSENSO ───────────────────────────────────────────
+    # Sentimiento extremo en una dirección = oportunidad contraria
+    extreme_fear   = rsi < 20 or stoch < 10
+    extreme_greed  = rsi > 80 or stoch > 90
+    consensus_lvl  = abs(rsi - 50) / 50
+    neurons["consenso"] = round(consensus_lvl, 2)
+    if extreme_fear:
+        boosts.append(+15)
+        alerts.append("⚡ SENTIMIENTO EXTREMO BAJISTA — Cuando todos huyen, los smart money compran.")
+    elif extreme_greed:
+        boosts.append(-12)
+        alerts.append("⚡ SENTIMIENTO EXTREMO ALCISTA — Cuando todos compran, los smart money venden.")
+
+    # ── RESULTADO FINAL ────────────────────────────────────────────────────
+    total_boost = sum(boosts)
+    total_boost = max(-25, min(+25, total_boost))  # cap ±25 puntos
+
+    # Diagnóstico principal (la neurona más activa)
+    top_alert = alerts[0] if alerts else "🧠 Mercado en estado psicológico neutro."
+
+    return {
+        "neuro_boost":   total_boost,
+        "neuro_alert":   top_alert,
+        "neuro_alerts":  alerts,
+        "neurons":       neurons,
+        "neuro_summary": _neuro_summary(neurons, total_boost)
+    }
+
+def _neuro_summary(neurons, boost):
+    """Genera resumen compacto para Telegram."""
+    icons = {"miedo":"😨","codicia":"🤑","dolor":"💔","trampa":"🪤","memoria":"🧠","consenso":"⚡"}
+    active = [(k,v) for k,v in neurons.items() if v > 0.5]
+    if not active:
+        return "🧠 Psicología: NEUTRAL"
+    top = sorted(active, key=lambda x: x[1], reverse=True)[:2]
+    parts = [f"{icons.get(k,'•')} {k.upper()} {int(v*100)}%" for k,v in top]
+    direction = "ALCISTA 🟢" if boost > 5 else "BAJISTA 🔴" if boost < -5 else "NEUTRAL ⚪"
+    return f"🧠 Neuro: {' | '.join(parts)} → {direction}"
+
+
 ml_scorer = MLScorer()
 
 # ══════════════════════════════════════════════════════════════════
