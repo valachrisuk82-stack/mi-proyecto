@@ -416,6 +416,14 @@ canvas{position:absolute;top:0;left:0}
       <div class="sb-counts"><span class="sb-buy" id="sbBuy">▲0</span><span class="sb-sell" id="sbSell">▼0</span></div>
     </div>
     <div class="sb-filter">
+      <button class="sf-btn on" id="cat-ALL" onclick="catFilter('ALL',this)" style="font-size:8px;padding:2px 5px">🌐 ALL</button>
+      <button class="sf-btn" id="cat-CRYPTO" onclick="catFilter('CRYPTO',this)" style="font-size:8px;padding:2px 5px">🪙 CRYPTO</button>
+      <button class="sf-btn" id="cat-FOREX" onclick="catFilter('FOREX',this)" style="font-size:8px;padding:2px 5px">💱 FOREX</button>
+      <button class="sf-btn" id="cat-COMMODITIES" onclick="catFilter('COMMODITIES',this)" style="font-size:8px;padding:2px 5px">🥇 COMD</button>
+      <button class="sf-btn" id="cat-INDICES" onclick="catFilter('INDICES',this)" style="font-size:8px;padding:2px 5px">📈 IDX</button>
+      <button class="sf-btn" id="cat-STOCKS" onclick="catFilter('STOCKS',this)" style="font-size:8px;padding:2px 5px">📊 STK</button>
+    </div>
+    <div class="sb-filter">
       <button class="sf-btn on" onclick="sbFilter('ALL',this)">ALL</button>
       <button class="sf-btn" onclick="sbFilter('BUY',this)">BUY</button>
       <button class="sf-btn" onclick="sbFilter('SELL',this)">SELL</button>
@@ -748,9 +756,13 @@ function sbFilter(f, btn) {
 }
 
 function selectPair(pair) {
-  if(S.pair){const prev=document.getElementById("pr_"+S.pair);if(prev)prev.classList.remove("sel");}
+  if(S.pair){
+    const prev=document.getElementById("pr_"+S.pair)||document.getElementById("pr_ext_"+S.pair);
+    if(prev)prev.classList.remove("sel");
+  }
   S.pair = pair;
-  const row = document.getElementById("pr_"+pair); if(row)row.classList.add("sel");
+  const row = document.getElementById("pr_"+pair)||document.getElementById("pr_ext_"+pair);
+  if(row)row.classList.add("sel");
   S.slP=null;S.tpP=null;S.trailP=null;
   updateChartHeader(pair); clearAI();
   fetchCandles(pair, S.tf);
@@ -1084,7 +1096,7 @@ function applyResult(r,pair){
     renderSR(pair);
   }
 
-  S.sigs[pair]={signal:sig,confidence:conf,sl:t.sl,tp:t.tp};
+  S.sigs[pair]={signal:sig,confidence:conf,sl:r.sl,tp:r.tp};
   const pb=document.getElementById("pb_"+pair);if(pb){pb.textContent=sig;pb.className="badge "+sig;}
   if(sig!=="WAIT")showAlert(pair,sig);
 
@@ -1119,6 +1131,56 @@ function showAlert(pair,signal){
   div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
   document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
 }
+
+const FOREX_PAIRS = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP"];
+const COMMODITY_PAIRS = ["XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN"];
+const INDEX_PAIRS = ["SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX"];
+const STOCK_PAIRS = ["AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"];
+const ALL_EXT = [...FOREX_PAIRS,...COMMODITY_PAIRS,...INDEX_PAIRS,...STOCK_PAIRS];
+const CAT_MAP = {"ALL":PAIRS,"CRYPTO":PAIRS,"FOREX":FOREX_PAIRS,"COMMODITIES":COMMODITY_PAIRS,"INDICES":INDEX_PAIRS,"STOCKS":STOCK_PAIRS};
+let S_extTickers = {};
+
+async function fetchExtTickers(){
+  try{
+    const r = await fetch(API_BASE+"/ext_tickers");
+    const d = await r.json();
+    S_extTickers = d;
+  }catch{}
+}
+
+function catFilter(cat, btn){
+  document.querySelectorAll("[id^='cat-']").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  const list = document.getElementById("pairList");
+  if(!list) return;
+  PAIRS.forEach(p=>{
+    const row=document.getElementById("pr_"+p);
+    if(row) row.style.display=(cat==="ALL"||cat==="CRYPTO")?"":"none";
+  });
+  ALL_EXT.forEach(p=>{
+    const row=document.getElementById("pr_ext_"+p);
+    if(row) row.style.display="none";
+  });
+  if(cat==="ALL"||cat==="CRYPTO") return;
+  const pairs = CAT_MAP[cat]||[];
+  pairs.forEach(p=>{
+    let row=document.getElementById("pr_ext_"+p);
+    if(!row){
+      const t=S_extTickers[p]||{};
+      const div=document.createElement("div");
+      div.className="pair-row";
+      div.id="pr_ext_"+p;
+      div.onclick=()=>selectPair(p);
+      div.innerHTML=`<div class="pr-left"><div class="pr-sym">${p}</div><div class="pr-price">${t.price||"---"}</div></div><div class="pr-right"><span class="badge WAIT">WAIT</span><div class="pr-chg">${t.change?t.change.toFixed(2)+"%":"--"}</div></div>`;
+      list.appendChild(div);
+      row=div;
+    }
+    row.style.display="";
+  });
+}
+
+setInterval(fetchExtTickers, 15000);
+fetchExtTickers();
 </script>
 </body>
 </html>
