@@ -3,9 +3,15 @@
 ║   NEXUS PRO ELITE — Servidor con ML + Trailing Stop             ║
 ║   Order Flow + Noticias Crypto + Bloomberg Style                ║
 ╚══════════════════════════════════════════════════════════════════╝
+
+INSTALAR:
+    pip3 install flask flask-cors anthropic requests pandas numpy scikit-learn
+
+EJECUTAR:
+    python3 nexus_server_elite.py
 """
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import anthropic
 import requests
@@ -15,20 +21,15 @@ import json
 import time
 import threading
 import re
-import os
-import sqlite3
-import hashlib
-import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import deque
-from functools import wraps
 
 # ══════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
     "anthropic_api_key": "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",
-    "telegram_token":    "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
+    "telegram_token":    "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
     "risk_pct":          1.0,
@@ -398,131 +399,6 @@ class MLScorer:
             "breakdown":  scores,
         }
 
-# ═══════════════════════════════════════════════════════
-#  NEUROPSYCHOLOGY ENGINE — 6 Neuronas del Mercado
-# ═══════════════════════════════════════════════════════
-def calc_neuro_psychology(ind, klines=None):
-    """
-    6 Neuronas Psicológicas que detectan el estado emocional del mercado.
-    Retorna boost al ML score y diagnóstico para Telegram.
-    """
-    rsi      = ind.get("rsi", 50)
-    volume   = ind.get("volume_ratio", 1.0)
-    macd     = ind.get("macd", 0)
-    macd_sig = ind.get("macd_signal", 0)
-    bb_pos   = ind.get("bb_position", 0.5)  # 0=banda baja, 1=banda alta
-    stoch    = ind.get("stoch_k", 50)
-    close    = ind.get("close", 0)
-    ema21    = ind.get("ema21", close)
-    ema50    = ind.get("ema50", close)
-
-    neurons = {}
-    boosts  = []
-    alerts  = []
-
-    # ── NEURONA 1: MIEDO COLECTIVO ─────────────────────────────────────────
-    # Pánico de la masa = oportunidad contraria
-    panic = rsi < 30 and volume > 2.0
-    fear_level = max(0, (35 - rsi) / 35)
-    if panic: fear_level = min(1.0, fear_level * 1.5)
-    neurons["miedo"] = round(fear_level, 2)
-    if panic:
-        boosts.append(+12)
-        alerts.append("😨 MIEDO COLECTIVO — La masa vende en pánico. Históricamente el mejor momento de compra.")
-    elif rsi < 25:
-        boosts.append(+18)
-        alerts.append("😱 PÁNICO EXTREMO — Capitulación detectada. Rebote inminente con alta probabilidad.")
-
-    # ── NEURONA 2: CODICIA / EUFORIA ───────────────────────────────────────
-    # Euforia = trampa para compradores tardíos
-    euphoria = rsi > 72 and volume > 1.8 and close > ema21
-    greed_level = max(0, (rsi - 60) / 40)
-    neurons["codicia"] = round(greed_level, 2)
-    if euphoria:
-        boosts.append(-10)
-        alerts.append("🤑 EUFORIA DETECTADA — Los latecomers están comprando el techo. Precaución máxima.")
-    elif rsi > 80:
-        boosts.append(-15)
-        alerts.append("🚨 SOBRECOMPRA EXTREMA — Mercado irracional alcista. Alta probabilidad de corrección.")
-
-    # ── NEURONA 3: CAPITULACIÓN (DOLOR MÁXIMO) ─────────────────────────────
-    # Dolor máximo del mercado = suelo potencial
-    bb_extreme_low = bb_pos < 0.08
-    cap_signal = bb_extreme_low and rsi < 35 and macd < macd_sig
-    cap_level = max(0, (0.2 - bb_pos) / 0.2) if bb_pos < 0.2 else 0
-    neurons["dolor"] = round(min(1.0, cap_level), 2)
-    if cap_signal:
-        boosts.append(+20)
-        alerts.append("💔 CAPITULACIÓN — Precio en banda inferior + RSI bajo. Suelo técnico y psicológico.")
-
-    # ── NEURONA 4: TRAMPA DEL MERCADO ──────────────────────────────────────
-    # Señal demasiado obvia = posible trampa
-    all_bull = (macd > macd_sig and rsi > 60 and close > ema21 and close > ema50 and volume > 1.5)
-    all_bear = (macd < macd_sig and rsi < 40 and close < ema21 and close < ema50 and volume > 1.5)
-    trap_level = 0.8 if (all_bull or all_bear) else 0.1
-    neurons["trampa"] = round(trap_level, 2)
-    if all_bull:
-        boosts.append(-8)
-        alerts.append("🪤 TRAMPA ALCISTA — Señal demasiado obvia. El mercado suele sorprender a la mayoría.")
-    elif all_bear:
-        boosts.append(-8)
-        alerts.append("🪤 TRAMPA BAJISTA — Todos ven la caída. Cuidado con el short squeeze.")
-
-    # ── NEURONA 5: MEMORIA DE PRECIO ───────────────────────────────────────
-    # Niveles psicológicos redondos actúan como soporte/resistencia
-    psych_levels = [1000,5000,10000,20000,25000,30000,40000,50000,
-                    60000,65000,70000,75000,80000,100000,
-                    1000,1500,2000,2500,3000,3500,4000,
-                    0.5,1.0,1.5,2.0,5.0,10.0,
-                    1800,1900,2000,2100,2200,2300,2400,2500,
-                    4000,4500,5000,5500,6000,
-                    1.0,1.05,1.1,1.15,1.2]
-    near_level = any(abs(close - l) / (close or 1) < 0.008 for l in psych_levels if l > 0)
-    neurons["memoria"] = 0.85 if near_level else 0.1
-    if near_level:
-        boosts.append(+5)
-        alerts.append("🧠 NIVEL PSICOLÓGICO — Precio en zona de memoria colectiva. Alta reactividad esperada.")
-
-    # ── NEURONA 6: ANTI-CONSENSO ───────────────────────────────────────────
-    # Sentimiento extremo en una dirección = oportunidad contraria
-    extreme_fear   = rsi < 20 or stoch < 10
-    extreme_greed  = rsi > 80 or stoch > 90
-    consensus_lvl  = abs(rsi - 50) / 50
-    neurons["consenso"] = round(consensus_lvl, 2)
-    if extreme_fear:
-        boosts.append(+15)
-        alerts.append("⚡ SENTIMIENTO EXTREMO BAJISTA — Cuando todos huyen, los smart money compran.")
-    elif extreme_greed:
-        boosts.append(-12)
-        alerts.append("⚡ SENTIMIENTO EXTREMO ALCISTA — Cuando todos compran, los smart money venden.")
-
-    # ── RESULTADO FINAL ────────────────────────────────────────────────────
-    total_boost = sum(boosts)
-    total_boost = max(-25, min(+25, total_boost))  # cap ±25 puntos
-
-    # Diagnóstico principal (la neurona más activa)
-    top_alert = alerts[0] if alerts else "🧠 Mercado en estado psicológico neutro."
-
-    return {
-        "neuro_boost":   total_boost,
-        "neuro_alert":   top_alert,
-        "neuro_alerts":  alerts,
-        "neurons":       neurons,
-        "neuro_summary": _neuro_summary(neurons, total_boost)
-    }
-
-def _neuro_summary(neurons, boost):
-    """Genera resumen compacto para Telegram."""
-    icons = {"miedo":"😨","codicia":"🤑","dolor":"💔","trampa":"🪤","memoria":"🧠","consenso":"⚡"}
-    active = [(k,v) for k,v in neurons.items() if v > 0.5]
-    if not active:
-        return "🧠 Psicología: NEUTRAL"
-    top = sorted(active, key=lambda x: x[1], reverse=True)[:2]
-    parts = [f"{icons.get(k,'•')} {k.upper()} {int(v*100)}%" for k,v in top]
-    direction = "ALCISTA 🟢" if boost > 5 else "BAJISTA 🔴" if boost < -5 else "NEUTRAL ⚪"
-    return f"🧠 Neuro: {' | '.join(parts)} → {direction}"
-
-
 ml_scorer = MLScorer()
 
 # ══════════════════════════════════════════════════════════════════
@@ -546,35 +422,20 @@ def calc_trailing_stop(signal, entry, current_price, atr):
 # ══════════════════════════════════════════════════════════════════
 #  MULTI-TIMEFRAME
 # ══════════════════════════════════════════════════════════════════
-_mtf_cache = {}
-_mtf_cache_ttl = 30  # segundos
-
 def multi_tf_analysis(symbol):
-    import time
-    now = time.time()
-    if symbol in _mtf_cache and now - _mtf_cache[symbol]["ts"] < _mtf_cache_ttl:
-        return _mtf_cache[symbol]["data"]
     result = {}
-    def fetch_tf(tf):
+    for tf in ["1m","5m","15m","1h"]:
         df = get_klines(symbol, tf, 100)
         if not df.empty and len(df)>=30:
             ind = calc_all_indicators(df)
-            ob = get_orderbook_deep(symbol, 20)
-            ml = ml_scorer.score(ind, ob)
-            return tf, {
-                "rsi":  ind.get("rsi",0),
-                "trend": "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA",
-                "signal": ml["signal"],
+            ob  = get_orderbook_deep(symbol, 20)
+            ml  = ml_scorer.score(ind, ob)
+            result[tf] = {
+                "rsi":     ind.get("rsi",0),
+                "trend":   "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA",
+                "signal":  ml["signal"],
                 "ml_score":ml["ml_score"],
             }
-        return tf, None
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        futures = [ex.submit(fetch_tf, tf) for tf in ["1m","5m","15m","1h"]]
-        for future in futures:
-            tf, data = future.result()
-            if data:
-                result[tf] = data
     bull = sum(1 for v in result.values() if v["signal"]=="BUY")
     bear = sum(1 for v in result.values() if v["signal"]=="SELL")
     if bull>=3:   conf = "ALCISTA FUERTE"
@@ -582,9 +443,7 @@ def multi_tf_analysis(symbol):
     elif bear>=3: conf = "BAJISTA FUERTE"
     elif bear>=2: conf = "BAJISTA"
     else:         conf = "NEUTRAL"
-    _result = {"timeframes": result, "confluence": conf, "bull": bull, "bear": bear}
-    _mtf_cache[symbol] = {"ts": now, "data": _result}
-    return _result
+    return {"timeframes": result, "confluence": conf, "bull": bull, "bear": bear}
 
 # ══════════════════════════════════════════════════════════════════
 #  CACHE
@@ -774,15 +633,6 @@ JSON:
 # ══════════════════════════════════════════════════════════════════
 #  FLASK
 # ══════════════════════════════════════════════════════════════════
-
-
-
-
-
-
-
-
-
 app = Flask(__name__)
 CORS(app)
 
@@ -827,16 +677,10 @@ def indicators(symbol):
 
 @app.route("/api/klines/<symbol>")
 def klines(symbol):
-    sym   = symbol.upper()
     tf    = request.args.get("tf", CONFIG["kline_tf"])
     limit = int(request.args.get("limit",120))
-    if sym in ALL_EXTERNAL:
-        yf_ticker = ALL_EXTERNAL[sym]["ticker"]
-        df = get_yahoo_klines_simple(yf_ticker, tf)
-    else:
-        df = get_klines(sym, tf, limit)
+    df = get_klines(symbol.upper(), tf, limit)
     if df.empty: return jsonify([])
-    df = df.tail(limit)
     return jsonify(df[["time","open","high","low","close","volume"]].assign(
         time=df["time"].astype(str)).to_dict(orient="records"))
 
@@ -920,185 +764,6 @@ def calc_stats(trades, capital, curve):
         if dd>maxDD: maxDD=dd
     return {"total_return":round(tr,2),"final_equity":round(equity,2),"win_rate":round(wr,1),
             "profit_factor":round(pf,2),"max_drawdown":round(maxDD,1),"total_trades":len(trades)}
-
-
-@app.route("/")
-@app.route("/app")
-def serve_app():
-    return send_file("nexus_apex-FINAL.html")
-
-@app.route("/login")
-def serve_login():
-    return send_file("nexus_login.html")
-
-@app.route("/auth/register", methods=["POST"])
-def register():
-    try:
-        data = request.get_json()
-        username = data.get("username","").strip().lower()
-        email = data.get("email","").strip().lower()
-        password = data.get("password","")
-        if len(username)<3: return jsonify({"ok":False,"error":"Usuario muy corto"}),400
-        if "@" not in email: return jsonify({"ok":False,"error":"Email invalido"}),400
-        if len(password)<6: return jsonify({"ok":False,"error":"Password minimo 6 caracteres"}),400
-        conn = sqlite3.connect("nexus_users.db")
-        c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
-        c.execute("SELECT id FROM users WHERE username=? OR email=?", (username, email))
-        if c.fetchone():
-            conn.close()
-            return jsonify({"ok":False,"error":"Usuario o email ya existe"}),400
-        import hashlib, json, base64
-        from datetime import timedelta
-        pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
-        c.execute("INSERT INTO users (username,email,password_hash,plan) VALUES (?,?,?,?)",(username,email,pw_hash,"free"))
-        uid = c.lastrowid
-        conn.commit(); conn.close()
-        payload = json.dumps({"user_id":uid,"plan":"free","exp":(datetime.now()+timedelta(days=30)).isoformat()})
-        p64 = base64.b64encode(payload.encode()).decode()
-        sig = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
-        return jsonify({"ok":True,"token":f"{p64}.{sig}","user":{"id":uid,"username":username,"email":email,"plan":"free"},"message":"Bienvenido!"})
-    except Exception as e:
-        return jsonify({"ok":False,"error":str(e)}),500
-
-@app.route("/auth/login", methods=["POST"])
-def login():
-    try:
-        data = request.get_json()
-        username = data.get("username","").strip().lower()
-        password = data.get("password","")
-        import hashlib, json, base64
-        from datetime import timedelta
-        conn = sqlite3.connect("nexus_users.db")
-        c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
-        pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
-        c.execute("SELECT id,username,email,plan FROM users WHERE (username=? OR email=?) AND password_hash=?",(username,username,pw_hash))
-        user = c.fetchone(); conn.close()
-        if not user: return jsonify({"ok":False,"error":"Credenciales incorrectas"}),401
-        payload = json.dumps({"user_id":user[0],"plan":user[3],"exp":(datetime.now()+timedelta(days=30)).isoformat()})
-        p64 = base64.b64encode(payload.encode()).decode()
-        sig = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
-        return jsonify({"ok":True,"token":f"{p64}.{sig}","user":{"id":user[0],"username":user[1],"email":user[2],"plan":user[3]}})
-    except Exception as e:
-        return jsonify({"ok":False,"error":str(e)}),500
-
-
-# ══ ACTIVOS EXTERNOS (Yahoo Finance) ══
-ALL_EXTERNAL = {
-    "EURUSD":{"ticker":"EURUSD=X","cat":"FOREX"},
-    "GBPUSD":{"ticker":"GBPUSD=X","cat":"FOREX"},
-    "USDJPY":{"ticker":"USDJPY=X","cat":"FOREX"},
-    "AUDUSD":{"ticker":"AUDUSD=X","cat":"FOREX"},
-    "USDCHF":{"ticker":"USDCHF=X","cat":"FOREX"},
-    "USDCAD":{"ticker":"USDCAD=X","cat":"FOREX"},
-    "NZDUSD":{"ticker":"NZDUSD=X","cat":"FOREX"},
-    "EURGBP":{"ticker":"EURGBP=X","cat":"FOREX"},
-    "XAUUSD":{"ticker":"GC=F","cat":"COMMODITIES"},
-    "XAGUSD":{"ticker":"SI=F","cat":"COMMODITIES"},
-    "USOIL": {"ticker":"CL=F","cat":"COMMODITIES"},
-    "UKOIL": {"ticker":"BZ=F","cat":"COMMODITIES"},
-    "NATGAS":{"ticker":"NG=F","cat":"COMMODITIES"},
-    "COPPER":{"ticker":"HG=F","cat":"COMMODITIES"},
-    "WHEAT": {"ticker":"ZW=F","cat":"COMMODITIES"},
-    "CORN":  {"ticker":"ZC=F","cat":"COMMODITIES"},
-    "SPX500":{"ticker":"^GSPC","cat":"INDICES"},
-    "NAS100":{"ticker":"^IXIC","cat":"INDICES"},
-    "DOW30": {"ticker":"^DJI","cat":"INDICES"},
-    "DAX40": {"ticker":"^GDAXI","cat":"INDICES"},
-    "FTSE100":{"ticker":"^FTSE","cat":"INDICES"},
-    "NIK225":{"ticker":"^N225","cat":"INDICES"},
-    "VIX":   {"ticker":"^VIX","cat":"INDICES"},
-    "AAPL":  {"ticker":"AAPL","cat":"STOCKS"},
-    "TSLA":  {"ticker":"TSLA","cat":"STOCKS"},
-    "NVDA":  {"ticker":"NVDA","cat":"STOCKS"},
-    "AMZN":  {"ticker":"AMZN","cat":"STOCKS"},
-    "MSFT":  {"ticker":"MSFT","cat":"STOCKS"},
-    "GOOGL": {"ticker":"GOOGL","cat":"STOCKS"},
-    "META":  {"ticker":"META","cat":"STOCKS"},
-    "NFLX":  {"ticker":"NFLX","cat":"STOCKS"},
-}
-
-def get_yahoo_price_simple(yf_ticker):
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
-        r = requests.get(url, params={"interval":"1m","range":"1d"}, headers={"User-Agent":"Mozilla/5.0"}, timeout=8)
-        data = r.json()
-        meta = data["chart"]["result"][0]["meta"]
-        price = meta.get("regularMarketPrice", 0)
-        prev  = meta.get("previousClose", price)
-        change = round((price - prev) / prev * 100, 2) if prev else 0
-        high  = meta.get("regularMarketDayHigh", price)
-        low   = meta.get("regularMarketDayLow", price)
-        return {"price": round(price,4), "change": change, "high": round(high,4), "low": round(low,4)}
-    except:
-        return {"price": 0, "change": 0, "high": 0, "low": 0}
-
-def get_yahoo_klines_simple(yf_ticker, tf="5m"):
-    try:
-        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
-        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
-        yf_tf  = tf_map.get(tf,"5m")
-        period = per_map.get(yf_tf,"5d")
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
-        r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
-        data  = r.json()
-        chart = data["chart"]["result"][0]
-        ts = chart.get("timestamp") or []
-        if not ts: return pd.DataFrame()
-        q  = chart["indicators"]["quote"][0]
-        df = pd.DataFrame({
-            "time":  pd.to_datetime(ts, unit="s"),
-            "open":  q.get("open",  [0]*len(ts)),
-            "high":  q.get("high",  [0]*len(ts)),
-            "low":   q.get("low",   [0]*len(ts)),
-            "close": q.get("close", [0]*len(ts)),
-            "volume":[x or 0 for x in q.get("volume",[0]*len(ts))],
-        }).dropna()
-        df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
-        return df
-    except Exception as e:
-        print(f"[ERROR] Yahoo klines {yf_ticker}: {e}")
-        return pd.DataFrame()
-
-_ext_cache = {}
-_ext_cache_time = {}
-EXT_CACHE_TTL = 60
-
-@app.route("/api/ext_tickers")
-def ext_tickers():
-    result = {}
-    now = time.time()
-    for sym, info in ALL_EXTERNAL.items():
-        cache_key = f"ext_{sym}"
-        if cache_key in _ext_cache and now - _ext_cache_time.get(cache_key,0) < EXT_CACHE_TTL:
-            result[sym] = _ext_cache[cache_key]
-            continue
-        try:
-            pd_data = get_yahoo_price_simple(info["ticker"])
-            ml  = cache["signals"].get(sym, {"signal":"WAIT","confidence":50,"ml_score":50})
-            entry = {
-                "price":      pd_data["price"],
-                "change":     pd_data["change"],
-                "high":       pd_data["high"],
-                "low":        pd_data["low"],
-                "category":   info["cat"],
-                "signal":     ml.get("signal","WAIT"),
-                "confidence": ml.get("confidence",50),
-                "ml_score":   ml.get("ml_score",50),
-                "whale":      "NEUTRAL",
-                "news":       "NEUTRAL",
-            }
-            _ext_cache[cache_key] = entry
-            _ext_cache_time[cache_key] = now
-            result[sym] = entry
-        except:
-            result[sym] = {"price":0,"change":0,"category":info["cat"],"signal":"WAIT","confidence":50,"ml_score":50}
-    return jsonify(result)
-
-@app.route("/api/categories")
-def categories():
-    return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
 
 # ══════════════════════════════════════════════════════════════════
 #  ARRANQUE
