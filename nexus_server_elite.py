@@ -28,7 +28,7 @@ from functools import wraps
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
     "anthropic_api_key": "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",
-    "telegram_token":    "8683659808:AAF241Fhd9yUmDcQsUgv1DfkM8CbckJ21zo",
+    "telegram_token":    "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
     "risk_pct":          1.0,
@@ -546,20 +546,35 @@ def calc_trailing_stop(signal, entry, current_price, atr):
 # ══════════════════════════════════════════════════════════════════
 #  MULTI-TIMEFRAME
 # ══════════════════════════════════════════════════════════════════
+_mtf_cache = {}
+_mtf_cache_ttl = 30  # segundos
+
 def multi_tf_analysis(symbol):
+    import time
+    now = time.time()
+    if symbol in _mtf_cache and now - _mtf_cache[symbol]["ts"] < _mtf_cache_ttl:
+        return _mtf_cache[symbol]["data"]
     result = {}
-    for tf in ["1m","5m","15m","1h"]:
+    def fetch_tf(tf):
         df = get_klines(symbol, tf, 100)
         if not df.empty and len(df)>=30:
             ind = calc_all_indicators(df)
-            ob  = get_orderbook_deep(symbol, 20)
-            ml  = ml_scorer.score(ind, ob)
-            result[tf] = {
-                "rsi":     ind.get("rsi",0),
-                "trend":   "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA",
-                "signal":  ml["signal"],
+            ob = get_orderbook_deep(symbol, 20)
+            ml = ml_scorer.score(ind, ob)
+            return tf, {
+                "rsi":  ind.get("rsi",0),
+                "trend": "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA",
+                "signal": ml["signal"],
                 "ml_score":ml["ml_score"],
             }
+        return tf, None
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futures = [ex.submit(fetch_tf, tf) for tf in ["1m","5m","15m","1h"]]
+        for future in futures:
+            tf, data = future.result()
+            if data:
+                result[tf] = data
     bull = sum(1 for v in result.values() if v["signal"]=="BUY")
     bear = sum(1 for v in result.values() if v["signal"]=="SELL")
     if bull>=3:   conf = "ALCISTA FUERTE"
@@ -567,7 +582,9 @@ def multi_tf_analysis(symbol):
     elif bear>=3: conf = "BAJISTA FUERTE"
     elif bear>=2: conf = "BAJISTA"
     else:         conf = "NEUTRAL"
-    return {"timeframes": result, "confluence": conf, "bull": bull, "bear": bear}
+    _result = {"timeframes": result, "confluence": conf, "bull": bull, "bear": bear}
+    _mtf_cache[symbol] = {"ts": now, "data": _result}
+    return _result
 
 # ══════════════════════════════════════════════════════════════════
 #  CACHE

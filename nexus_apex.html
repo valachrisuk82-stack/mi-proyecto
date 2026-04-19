@@ -843,10 +843,10 @@ function selectPair(pair) {
   const row = document.getElementById("pr_"+pair); if(row)row.classList.add("sel");
   S.slP=null;S.tpP=null;S.trailP=null;
   updateChartHeader(pair); clearAI();
-  fetchCandles(pair, S.tf);
-  if(S.serverOk){fetchIndicators(pair);}else{simIndicators(pair);}
-  updatePatterns(pair); renderSR(pair);
-}
+		Promise.all([
+			fetchCandles(pair, S.tf),
+			S.serverOk ? fetchIndicators(pair) : Promise.resolve(simIndicators(pair))
+		]).then(() => { updatePatterns(pair); renderSR(pair); });
 
 // ── CANDLES ──
 async function fetchCandles(pair, tf) {
