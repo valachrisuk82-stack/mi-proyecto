@@ -36,7 +36,7 @@ CONFIG = {
     "kline_tf":          "5m",
     "kline_limit":       200,
     "refresh_sec":       30,
-    "min_confidence":    72,
+    "min_confidence":    62,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
 
