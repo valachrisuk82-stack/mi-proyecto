@@ -14,13 +14,15 @@ EJECUTAR:
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import anthropic
-import requests
+import re
+import osquests
 import pandas as pd
 import numpy as np
 import json
 import time
 import threading
 import re
+import os
 from datetime import datetime
 from collections import deque
 
