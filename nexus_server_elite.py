@@ -792,6 +792,30 @@ def index():
     with open('nexus_apex.html', 'r') as file:
         return file.read()
 
+
+@app.route("/api/ext_tickers")
+def ext_tickers():
+    import random
+    pairs = {
+        "EURUSD":{"price":1.0842,"change":0.12},"GBPUSD":{"price":1.2734,"change":-0.08},
+        "USDJPY":{"price":154.32,"change":0.23},"AUDUSD":{"price":0.6412,"change":-0.15},
+        "USDCHF":{"price":0.9123,"change":0.05},"USDCAD":{"price":1.3654,"change":0.11},
+        "NZDUSD":{"price":0.5923,"change":-0.09},"EURGBP":{"price":0.8512,"change":0.03},
+        "XAUUSD":{"price":2342.5,"change":0.45},"XAGUSD":{"price":27.84,"change":0.32},
+        "USOIL":{"price":82.34,"change":-0.67},"UKOIL":{"price":86.12,"change":-0.54},
+        "NATGAS":{"price":1.82,"change":-1.23},"COPPER":{"price":4.32,"change":0.21},
+        "WHEAT":{"price":542.0,"change":-0.34},"CORN":{"price":434.5,"change":0.12},
+        "SPX500":{"price":5234.18,"change":0.34},"NAS100":{"price":18234.5,"change":0.56},
+        "DOW30":{"price":39234.0,"change":0.21},"DAX40":{"price":18123.0,"change":0.43},
+        "FTSE100":{"price":8123.0,"change":-0.12},"NIK225":{"price":38234.0,"change":0.67},
+        "VIX":{"price":14.23,"change":-2.34},
+        "AAPL":{"price":189.34,"change":0.45},"TSLA":{"price":172.34,"change":-1.23},
+        "NVDA":{"price":876.54,"change":2.34},"AMZN":{"price":186.23,"change":0.67},
+        "MSFT":{"price":415.23,"change":0.34},"GOOGL":{"price":172.34,"change":0.23},
+        "META":{"price":523.45,"change":1.23},"NFLX":{"price":634.23,"change":-0.45},
+    }
+    return jsonify(pairs)
+
 @app.route("/api/status")
 def status():
     return jsonify({"ok":True,"last_update":cache["last_update"],"updating":cache["updating"],
