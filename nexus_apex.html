@@ -637,7 +637,9 @@ async function checkServer() {
       tg.style.color = "var(--up)";
       tg.style.background = "var(--up-g)";
     }
-    fetchTickers(); fetchIndicators(S.pair); fetchCandles(S.pair, S.tf);
+    const _extP=["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP","XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN","SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX","AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"];
+    fetchTickers(); fetchCandles(S.pair, S.tf);
+    if(!_extP.includes(S.pair)){fetchIndicators(S.pair);}
   } catch {
     S.serverOk = false;
     document.getElementById("liveText").textContent = "OFFLINE";
@@ -766,12 +768,24 @@ function selectPair(pair) {
   S.slP=null;S.tpP=null;S.trailP=null;
   updateChartHeader(pair); clearAI();
   fetchCandles(pair, S.tf);
-  if(S.serverOk){fetchIndicators(pair);}else{simIndicators(pair);}
-  updatePatterns(pair); renderSR(pair);
+  const extPairs = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP","XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN","SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX","AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"];
+  if(!extPairs.includes(pair)){
+    if(S.serverOk){fetchIndicators(pair);}else{simIndicators(pair);}
+    updatePatterns(pair); renderSR(pair);
+  }
 }
 
 // ── CANDLES ──
 async function fetchCandles(pair, tf) {
+  const extPairs = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP","XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN","SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX","AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"];
+  if(extPairs.includes(pair)){
+    // Para pares externos mostrar grafico vacio por ahora
+    S.candles=[];
+    document.getElementById("chPair").textContent=pair;
+    const t=S_extTickers[pair]||{};
+    document.getElementById("chPrice").textContent=t.price?"$"+t.price.toLocaleString():"---";
+    return;
+  }
   if(S.serverOk){
     try{const r=await fetch(`${API}/klines/${pair}?tf=${tf}&limit=130`);const d=await r.json();if(d&&d.length){S.candles=d;drawCandles(d);document.getElementById("chPair").title=`${d.length} velas · Binance real`;return;}}catch{}
   }
@@ -779,6 +793,8 @@ async function fetchCandles(pair, tf) {
 }
 
 async function fetchCandlesDirect(pair, tf) {
+  const extPairs = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP","XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN","SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX","AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"];
+  if(extPairs.includes(pair)) return;
   try{
     const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${tf}&limit=130`);
     const data=await r.json();
@@ -1143,9 +1159,8 @@ let S_extTickers = {};
 async function fetchExtTickers(){
   try{
     const r = await fetch(API_BASE+"/ext_tickers");
-    const d = await r.json();
-    S_extTickers = d;
-  }catch{}
+    S_extTickers = await r.json();
+  }catch(e){}
 }
 
 function catFilter(cat, btn){
@@ -1153,27 +1168,32 @@ function catFilter(cat, btn){
   btn.classList.add("on");
   const list = document.getElementById("pairList");
   if(!list) return;
+  // Ocultar crypto
   PAIRS.forEach(p=>{
     const row=document.getElementById("pr_"+p);
     if(row) row.style.display=(cat==="ALL"||cat==="CRYPTO")?"":"none";
   });
-  ALL_EXT.forEach(p=>{
-    const row=document.getElementById("pr_ext_"+p);
-    if(row) row.style.display="none";
-  });
+  // Ocultar todos los externos primero
+  document.querySelectorAll("[id^='pr_ext_']").forEach(r=>r.style.display="none");
   if(cat==="ALL"||cat==="CRYPTO") return;
-  const pairs = CAT_MAP[cat]||[];
+  // Mostrar los del categoria seleccionada
+  const catPairs = {
+    "FOREX":["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP"],
+    "COMMODITIES":["XAUUSD","XAGUSD","USOIL","UKOIL","NATGAS","COPPER","WHEAT","CORN"],
+    "INDICES":["SPX500","NAS100","DOW30","DAX40","FTSE100","NIK225","VIX"],
+    "STOCKS":["AAPL","TSLA","NVDA","AMZN","MSFT","GOOGL","META","NFLX"]
+  };
+  const pairs = catPairs[cat]||[];
   pairs.forEach(p=>{
     let row=document.getElementById("pr_ext_"+p);
     if(!row){
       const t=S_extTickers[p]||{};
-      const div=document.createElement("div");
-      div.className="pair-row";
-      div.id="pr_ext_"+p;
-      div.onclick=()=>selectPair(p);
-      div.innerHTML=`<div class="pr-left"><div class="pr-sym">${p}</div><div class="pr-price">${t.price||"---"}</div></div><div class="pr-right"><span class="badge WAIT">WAIT</span><div class="pr-chg">${t.change?t.change.toFixed(2)+"%":"--"}</div></div>`;
-      list.appendChild(div);
-      row=div;
+      row=document.createElement("div");
+      row.className="pair-row";
+      row.id="pr_ext_"+p;
+      row.onclick=()=>selectPair(p);
+      row.innerHTML=`<div class="pr-left"><div class="pr-sym">${p}</div><div class="pr-price" id="pp_ext_${p}">${t.price||"---"}</div></div><div class="pr-right"><span class="badge WAIT" id="pb_ext_${p}">WAIT</span><div class="pr-chg" id="pc_ext_${p}">${t.change!=null?t.change.toFixed(2)+"%":"--"}</div></div>`;
+      list.appendChild(row);
     }
     row.style.display="";
   });
