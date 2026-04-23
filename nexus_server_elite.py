@@ -665,7 +665,54 @@ def bg_updater():
 # ══════════════════════════════════════════════════════════════════
 #  CLAUDE AI
 # ══════════════════════════════════════════════════════════════════
+_analyze_cache = {}
+_analyze_cache_time = {}
+ANALYZE_CACHE_TTL = 300  # 5 minutos
+
+_analyze_cache = {}
+_analyze_cache_time = {}
+ANALYZE_CACHE_TTL = 300  # 5 minutos
+
+def analyze_local(pair):
+    """Análisis local sin IA cuando no hay créditos"""
+    ticker = cache["tickers"].get(pair, {})
+    ind    = cache["indicators"].get(pair, {})
+    ml     = cache["signals"].get(pair, {"ml_score":50, "signal":"WAIT", "confidence":50})
+    # Precio para crypto
+    price = float(ticker.get("lastPrice", 0))
+    # Fallback para activos externos (FOREX, COMD, IDX, STK)
+    if not price and pair in ALL_EXTERNAL:
+        try:
+            pd_data = get_yahoo_price_simple(ALL_EXTERNAL[pair]["ticker"])
+            price = pd_data.get("price", 0)
+        except:
+            price = 0
+    atr    = ind.get("atr", price*0.012)
+    sig    = ml.get("signal","WAIT")
+    conf   = ml.get("confidence",50)
+    sl     = price - atr*1.5 if sig=="BUY" else price + atr*1.5
+    tp     = price + atr*3   if sig=="BUY" else price - atr*3
+    trail  = calc_trailing_stop(sig, price, price, atr)
+    capital= CONFIG["capital"]; risk=CONFIG["risk_pct"]
+    lot    = (capital*risk/100)/max(abs(price-sl),0.0001)
+    rsi    = ind.get("rsi",50)
+    trend  = "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA"
+    return {
+        "signal": sig, "confidence": conf, "entry": price,
+        "sl": sl, "tp": tp, "trailing_sl": trail, "rr": 2.0, "lot": lot,
+        "trend": trend, "strength": "MODERADO",
+        "reasoning": f"ML Score {ml.get('ml_score',50)}/100. RSI {rsi:.0f}. Análisis local.",
+        "key_support": sl, "key_resistance": tp,
+        "news_impact": "NEUTRAL", "whale_alert": False, "warnings": []
+    }
+
 def analyze_ai(pair):
+    now = time.time()
+    if pair in _analyze_cache and now - _analyze_cache_time.get(pair, 0) < ANALYZE_CACHE_TTL:
+        return _analyze_cache[pair]
+    now = time.time()
+    if pair in _analyze_cache and now - _analyze_cache_time.get(pair, 0) < ANALYZE_CACHE_TTL:
+        return _analyze_cache[pair]
     client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
     ticker = cache["tickers"].get(pair, {})
     ind    = cache["indicators"].get(pair, {})
@@ -726,7 +773,7 @@ JSON:
   "lot": número,
   "trend": "ALCISTA"|"BAJISTA"|"LATERAL",
   "strength": "FUERTE"|"MODERADO"|"DÉBIL",
-  "reasoning": "máximo 2 oraciones en español",
+  "reasoning": "1 oración en español",
   "key_support": número,
   "key_resistance": número,
   "news_impact": "POSITIVO"|"NEGATIVO"|"NEUTRAL",
@@ -735,8 +782,8 @@ JSON:
 }}"""
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1000,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=350,
         messages=[{"role":"user","content":prompt}]
     )
     raw   = response.content[0].text.strip()
@@ -769,6 +816,8 @@ JSON:
                 result.get("rr",2), result.get("trailing_sl",0),
                 result.get("reasoning",""), ml.get("ml_score",0), news.get("score",0))
             send_telegram(msg)
+    _analyze_cache[pair] = result
+    _analyze_cache_time[pair] = time.time()
     return result
 
 # ══════════════════════════════════════════════════════════════════
@@ -854,7 +903,9 @@ def analyze(symbol):
         result = analyze_ai(symbol.upper())
         return jsonify({"ok":True,"result":result})
     except Exception as e:
-        return jsonify({"ok":False,"error":str(e)}), 500
+        print(f"[AI fallback] {symbol}: {e}")
+        result = analyze_local(symbol.upper())
+        return jsonify({"ok":True,"result":result,"fallback":True})
 
 @app.route("/api/mtf/<symbol>")
 def mtf(symbol):
