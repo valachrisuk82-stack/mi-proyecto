@@ -317,6 +317,18 @@ canvas{position:absolute;top:0;left:0}
       </div>
     </div>
 
+    <!-- INDICATORS BAR -->
+    <div style="display:flex;align-items:center;gap:10px;padding:3px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(0,255,136,0.06);font-size:10px;font-family:'JetBrains Mono',monospace;flex-wrap:wrap;">
+      <span style="color:var(--text3);font-size:9px">RSI</span><span id="ioRsi" style="color:var(--gold)">--</span>
+      <span style="color:var(--text3);font-size:9px">MACD</span><span id="ioMacd" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">EMA</span><span id="ioEma" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">BB</span><span id="ioBb" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">Stoch</span><span id="ioStoch" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">ATR</span><span id="ioAtr" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">Vol</span><span id="ioVol" style="color:var(--text2)">--</span>
+      <span style="color:var(--text3);font-size:9px">B/S</span><span id="ioFlow" style="color:var(--up)">--</span>
+      <span id="rpBadge" style="color:var(--up);margin-left:auto;font-size:9px">● REAL</span>
+    </div>
     <!-- PATTERNS -->
     <div class="pattern-bar" id="patternBar">
       <span class="pnone">Sin patrones detectados</span>
@@ -333,18 +345,6 @@ canvas{position:absolute;top:0;left:0}
         <div class="ml-ov-bar"><div class="ml-ov-fill" id="mlFill" style="width:0%;background:var(--gold)"></div></div>
       </div>
 
-      <div class="info-overlay" id="infoOverlay">
-        <div class="io-title">Indicadores <span class="rp-badge real" id="rpBadge" style="pointer-events:none">● REAL</span></div>
-        <div class="io-row"><span class="io-label">RSI(14)</span><span class="io-val" id="ioRsi" style="color:var(--neon-gold)">--</span></div>
-        <div class="io-row"><span class="io-label">MACD Hist</span><span class="io-val" id="ioMacd">--</span></div>
-        <div class="io-row"><span class="io-label">EMA 9/21</span><span class="io-val" id="ioEma">--</span></div>
-        <div class="io-row"><span class="io-label">BB Pos</span><span class="io-val" id="ioBb" style="color:var(--text2)">--</span></div>
-        <div class="io-sep"></div>
-        <div class="io-row"><span class="io-label">Stoch K/D</span><span class="io-val" id="ioStoch">--</span></div>
-        <div class="io-row"><span class="io-label">ATR(14)</span><span class="io-val" id="ioAtr" style="color:var(--text2)">--</span></div>
-        <div class="io-row"><span class="io-label">Vol Ratio</span><span class="io-val" id="ioVol">--</span></div>
-        <div class="io-row"><span class="io-label">Buy/Sell</span><span class="io-val" id="ioFlow" style="color:var(--neon-up)">--</span></div>
-      </div>
     </div>
 
     <!-- METRICS -->
