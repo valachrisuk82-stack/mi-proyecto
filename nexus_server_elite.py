@@ -27,7 +27,7 @@ from functools import wraps
 #  CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════
 CONFIG = {
-    "anthropic_api_key": "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",
+    "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
     "telegram_token":    "8683659808:AAGqxOiZUBnzhNWnk-ET5Cz7ZQKGPBUrHH0",
     "telegram_chat_id":  "8204656882",
     "capital":           1000.0,
@@ -35,7 +35,7 @@ CONFIG = {
     "kline_tf":          "5m",
     "kline_limit":       200,
     "refresh_sec":       30,
-    "min_confidence":    72,
+    "min_confidence":    60,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
 
@@ -387,8 +387,8 @@ class MLScorer:
         total = max(0, min(100, total))
 
         # Signal
-        if total >= 68:   signal, conf = "BUY",  round(min(95, total))
-        elif total <= 32: signal, conf = "SELL", round(min(95, 100-total))
+        if total >= 60:   signal, conf = "BUY",  round(min(95, total))
+        elif total <= 40: signal, conf = "SELL", round(min(95, 100-total))
         else:             signal, conf = "WAIT", round(50)
 
         return {
@@ -838,7 +838,9 @@ def klines(symbol):
     limit = int(request.args.get("limit",120))
     if sym in ALL_EXTERNAL:
         yf_ticker = ALL_EXTERNAL[sym]["ticker"]
-        df = get_yahoo_klines_simple(yf_ticker, tf)
+        # Yahoo no tiene M1 real para activos externos — forzar mínimo 5m
+        ext_tf = tf if tf not in ["1m"] else "5m"
+        df = get_yahoo_klines_simple(yf_ticker, ext_tf)
     else:
         df = get_klines(sym, tf, limit)
     if df.empty: return jsonify([])
