@@ -759,6 +759,44 @@ function drawCandles(candles) {
     });
   }
 
+  // EMA 9 y EMA 21
+  const ind = S.inds[S.pair];
+  if(ind && ind.ema9 && ind.ema21) {
+    // Calcular EMA dinámicamente sobre las velas visibles
+    const calcEMA = (data, period) => {
+      const k = 2/(period+1);
+      let ema = data[0];
+      return data.map(v => { ema = v*k + ema*(1-k); return ema; });
+    };
+    const closes = candles.map(c=>c.close);
+    const ema9arr = calcEMA(closes, 9);
+    const ema21arr = calcEMA(closes, 21);
+    // Dibujar EMA9 (verde)
+    ctx.strokeStyle="rgba(0,255,136,0.7)";ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.beginPath();
+    ema9arr.forEach((v,i)=>{
+      if(v<lo||v>hi)return;
+      const x=pad.left+i*gap+gap/2;const y=toY(v);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Dibujar EMA21 (naranja)
+    ctx.strokeStyle="rgba(251,146,60,0.7)";ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ema21arr.forEach((v,i)=>{
+      if(v<lo||v>hi)return;
+      const x=pad.left+i*gap+gap/2;const y=toY(v);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Labels
+    const lastX=W-pad.right-2;
+    ctx.font="bold 8px 'JetBrains Mono'";
+    ctx.fillStyle="rgba(0,255,136,0.9)";
+    ctx.fillText("EMA9", lastX-28, toY(ema9arr[ema9arr.length-1])-3);
+    ctx.fillStyle="rgba(251,146,60,0.9)";
+    ctx.fillText("EMA21", lastX-32, toY(ema21arr[ema21arr.length-1])+10);
+  }
   // S/R lines
   const sr=S.srData[S.pair];
   if(sr){
