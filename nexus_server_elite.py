@@ -874,10 +874,22 @@ def tickers():
 
 @app.route("/api/indicators/<symbol>")
 def indicators(symbol):
-    ind  = cache["indicators"].get(symbol.upper(),{})
-    ml   = cache["signals"].get(symbol.upper(),{"signal":"SCAN","confidence":0,"ml_score":0})
-    ob   = cache["orderflow"].get(symbol.upper(),{})
-    news = cache["news"].get(symbol.upper(),{})
+    sym = symbol.upper()
+    ind  = cache["indicators"].get(sym,{})
+    ml   = cache["signals"].get(sym,{"signal":"SCAN","confidence":0,"ml_score":0})
+    ob   = cache["orderflow"].get(sym,{})
+    news = cache["news"].get(sym,{})
+    if not ind and sym in ALL_EXTERNAL:
+        try:
+            df = get_yahoo_klines_simple(ALL_EXTERNAL[sym]["ticker"], "5m")
+            if not df.empty and len(df) >= 30:
+                df["volume"] = df["volume"].replace(0,1).fillna(1)
+                ind = calc_all_indicators(df)
+                ml  = ml_scorer.score(ind, {})
+                cache["indicators"][sym] = ind
+                cache["signals"][sym] = ml
+        except Exception as e:
+            print(f"[ind ext] {sym}: {e}")
     return jsonify({"indicators":ind,"signal":ml,"orderflow":ob,"news":news})
 
 @app.route("/api/klines/<symbol>")
@@ -981,7 +993,6 @@ def calc_stats(trades, capital, curve):
             "profit_factor":round(pf,2),"max_drawdown":round(maxDD,1),"total_trades":len(trades)}
 
 
-@app.route("/")
 @app.route("/app")
 def serve_app():
     return send_file("nexus_apex-FINAL.html")
