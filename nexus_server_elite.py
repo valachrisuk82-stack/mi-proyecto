@@ -607,7 +607,7 @@ cache = {
     "history":    [],
     "last_update":None,
     "updating":   False,
-    "last_alerts":{},
+    "last_alerts":{},"sr_alerts":{},
 }
 
 def update_all():
@@ -651,6 +651,38 @@ def update_all():
         except Exception as e:
             print(f"  ✗ {pair}: {e}")
 
+    # ── Alertas de precio en S/R ──
+    for pair in PAIRS:
+        try:
+            ind  = cache["indicators"].get(pair, {})
+            sr   = ind.get("sr", {})
+            t    = cache["tickers"].get(pair, {})
+            price = float(t.get("lastPrice", 0))
+            if not price: continue
+            atr  = ind.get("atr", price*0.01)
+            tol  = atr * 0.3  # tolerancia = 30% del ATR
+            prev_alerts = cache.get("sr_alerts", {})
+            for sup in sr.get("support", []):
+                key = f"{pair}_S_{round(sup,2)}"
+                if abs(price - sup) <= tol and key not in prev_alerts:
+                    msg = f"🟢 <b>SOPORTE TOCADO</b>
+{pair} @ <b>${price:,.4f}</b>
+Soporte: ${sup:,.4f}
+ATR: {atr:.4f}"
+                    send_telegram(msg)
+                    prev_alerts[key] = datetime.now()
+            for res in sr.get("resistance", []):
+                key = f"{pair}_R_{round(res,2)}"
+                if abs(price - res) <= tol and key not in prev_alerts:
+                    msg = f"🔴 <b>RESISTENCIA TOCADA</b>
+{pair} @ <b>${price:,.4f}</b>
+Resistencia: ${res:,.4f}
+ATR: {atr:.4f}"
+                    send_telegram(msg)
+                    prev_alerts[key] = datetime.now()
+            # Limpiar alertas viejas (>2h)
+            cache["sr_alerts"] = {k:v for k,v in prev_alerts.items() if (datetime.now()-v).seconds < 7200}
+        except: pass
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")

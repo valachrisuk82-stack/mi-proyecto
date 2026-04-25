@@ -364,9 +364,20 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <div class="ai-panel" id="aiPanel">
-  <div class="ai-panel-toggle" onclick="toggleAiPanel()">
+  <div class="ai-panel-toggle" onclick="toggleAiPanel()" style="display:flex;align-items:center;justify-content:space-between">
     <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN</span>
-    <span class="ai-panel-arrow" id="panelArrow">▲</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="event.stopPropagation();toggleHistory()" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);color:var(--neon-up);font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace">📋 HISTORIAL</button>
+      <span class="ai-panel-arrow" id="panelArrow">▲</span>
+    </div>
+  </div>
+  <!-- HISTORIAL PANEL -->
+  <div id="historyPanel" style="display:none;position:absolute;bottom:302px;right:0;width:420px;background:rgba(2,3,10,0.98);border:1px solid rgba(0,255,136,0.2);border-radius:8px 0 0 8px;z-index:200;max-height:400px;overflow-y:auto">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,255,136,0.1);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)">📋 HISTORIAL DE SEÑALES</span>
+      <button onclick="toggleHistory()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div id="historyList" style="padding:8px"></div>
   </div>
   <div class="ai-panel-body">
 
@@ -1132,6 +1143,43 @@ function showAlert(pair,signal){
   div.className=`alert-flash ${signal}`;
   div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
   document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
+}
+
+function toggleHistory() {
+  const panel = document.getElementById("historyPanel");
+  if(panel.style.display === "none") {
+    panel.style.display = "block";
+    fetchHistory();
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+async function fetchHistory() {
+  try {
+    const r = await fetch(API_BASE + "/history");
+    const data = await r.json();
+    const list = document.getElementById("historyList");
+    if(!data.length) {
+      list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Sin señales todavía</div>';
+      return;
+    }
+    list.innerHTML = data.map(h => {
+      const col = h.signal==="BUY" ? "var(--up)" : h.signal==="SELL" ? "var(--dn)" : "var(--gold)";
+      const src = h.source==="AI" ? "🤖" : h.source==="AUTO" ? "⚡" : "👤";
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'JetBrains Mono',monospace;font-size:10px">
+        <span style="color:var(--text3);min-width:42px">${h.time}</span>
+        <span style="color:var(--text2);min-width:90px;font-size:9px">${h.pair}</span>
+        <span style="color:${col};font-weight:700;min-width:36px">${h.signal}</span>
+        <span style="color:var(--gold);min-width:32px">${h.confidence}%</span>
+        <span style="color:var(--text2);min-width:70px">$${parseFloat(h.price).toLocaleString(undefined,{maximumFractionDigits:4})}</span>
+        <span style="color:var(--text3);min-width:36px">ML:${h.ml_score}</span>
+        <span style="font-size:12px">${src}</span>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    document.getElementById("historyList").innerHTML = '<div style="color:var(--dn);font-size:10px;padding:10px">Error cargando historial</div>';
+  }
 }
 
 function toggleAiPanel(){
