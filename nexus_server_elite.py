@@ -160,38 +160,35 @@ NEGATIVE_WORDS = ["bear", "crash", "dump", "drop", "hack", "ban", "regulation",
                   "scam", "fraud", "liquidation", "correction", "resistance"]
 
 def get_news_sentiment(symbol):
-    """Obtiene noticias y calcula sentimiento"""
-    coin = symbol.replace("USDT","").lower()
+    """Obtiene noticias via RSS gratuito"""
+    import re
+    coin_lower = symbol.replace("USDT","").lower()
     score = 0
     headlines = []
-
-    try:
-        # CryptoCompare news
-        r = requests.get(
-            f"https://min-api.cryptocompare.com/data/v2/news/?categories={coin}&extraParams=NexusPro",
-            timeout=6
-        )
-        data = r.json().get("Data", [])[:10]
-        for item in data:
-            title = item.get("title","").lower()
-            headlines.append(item.get("title","")[:80])
-            for w in POSITIVE_WORDS:
-                if w in title: score += 1
-            for w in NEGATIVE_WORDS:
-                if w in title: score -= 1
-    except: pass
-
-    # Normalize
+    sources = [
+        "https://cointelegraph.com/rss",
+        "https://decrypt.co/feed",
+        "https://cryptonews.com/news/feed/",
+    ]
+    for url in sources:
+        try:
+            r = requests.get(url, timeout=5, headers={"User-Agent":"Mozilla/5.0"})
+            titles = re.findall(r"<title><![CDATA[(.*?)]]></title>", r.text)
+            if not titles:
+                titles = re.findall(r"<title>(.*?)</title>", r.text)
+            for title in titles[1:8]:
+                tc = title.strip()[:100]
+                tl = tc.lower()
+                if coin_lower in tl or "bitcoin" in tl or "crypto" in tl:
+                    headlines.append(tc)
+                    for w in POSITIVE_WORDS:
+                        if w in tl: score += 1
+                    for w in NEGATIVE_WORDS:
+                        if w in tl: score -= 1
+        except: pass
     normalized = max(-10, min(10, score))
-    label = "MUY POSITIVO" if normalized > 5 else "POSITIVO" if normalized > 1 else \
-            "MUY NEGATIVO" if normalized < -5 else "NEGATIVO" if normalized < -1 else "NEUTRAL"
-
-    return {
-        "score":     normalized,
-        "label":     label,
-        "headlines": headlines[:5],
-    }
-
+    label = "MUY POSITIVO" if normalized>5 else "POSITIVO" if normalized>1 else "MUY NEGATIVO" if normalized<-5 else "NEGATIVO" if normalized<-1 else "NEUTRAL"
+    return {"score":normalized,"label":label,"headlines":list(dict.fromkeys(headlines))[:5]}
 # ══════════════════════════════════════════════════════════════════
 #  INDICADORES TÉCNICOS
 # ══════════════════════════════════════════════════════════════════

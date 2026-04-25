@@ -369,6 +369,7 @@ canvas{position:absolute;top:0;left:0}
   <div class="ai-panel-toggle" onclick="toggleAiPanel()" style="display:flex;align-items:center;justify-content:space-between">
     <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN</span>
     <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="event.stopPropagation();toggleNews()" style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace">📰 NOTICIAS</button>
       <button onclick="event.stopPropagation();toggleHistory()" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);color:var(--neon-up);font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace">📋 HISTORIAL</button>
       <span class="ai-panel-arrow" id="panelArrow">▲</span>
     </div>
@@ -380,6 +381,14 @@ canvas{position:absolute;top:0;left:0}
       <button onclick="toggleHistory()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
     </div>
     <div id="historyList" style="padding:8px"></div>
+  </div>
+  <!-- NOTICIAS PANEL -->
+  <div id="newsPanel" style="display:none;position:absolute;bottom:302px;left:220px;width:420px;background:rgba(2,3,10,0.98);border:1px solid rgba(0,255,136,0.2);border-radius:0 8px 8px 0;z-index:200;max-height:400px;overflow-y:auto">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,255,136,0.1);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)">📰 NOTICIAS CRYPTO</span>
+      <button onclick="toggleNews()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div id="newsList" style="padding:8px"></div>
   </div>
   <div class="ai-panel-body">
 
@@ -1223,6 +1232,46 @@ function checkPriceAlerts() {
 }
 setInterval(checkPriceAlerts, 5000);
 
+
+function toggleNews() {
+  const panel = document.getElementById("newsPanel");
+  if(panel.style.display === "none") {
+    panel.style.display = "block";
+    fetchNews();
+  } else {
+    panel.style.display = "none";
+  }
+}
+
+async function fetchNews() {
+  const list = document.getElementById("newsList");
+  list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Cargando noticias...</div>';
+  try {
+    const pair = S.pair || "BTCUSDT";
+    const r = await fetch(API_BASE + "/news/" + pair);
+    const d = await r.json();
+    const headlines = d.headlines || [];
+    const label = d.label || "NEUTRAL";
+    const score = d.score || 0;
+    const labelColor = score>1?"var(--up)":score<-1?"var(--dn)":"var(--gold)";
+    if(!headlines.length) {
+      list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Sin noticias disponibles</div>';
+      return;
+    }
+    list.innerHTML = `
+      <div style="padding:6px 8px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:9px;color:var(--text3)">SENTIMIENTO:</span>
+        <span style="color:${labelColor};font-weight:700;font-size:10px">${label}</span>
+        <span style="color:var(--text3);font-size:9px">Score: ${score}</span>
+      </div>
+      ${headlines.map(h=>`
+        <div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:10px;color:var(--text2);line-height:1.4;font-family:'JetBrains Mono',monospace">
+          📄 ${h}
+        </div>`).join("")}`;
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--dn);font-size:10px;padding:10px">Error cargando noticias</div>';
+  }
+}
 function toggleHistory() {
   const panel = document.getElementById("historyPanel");
   if(panel.style.display === "none") {
