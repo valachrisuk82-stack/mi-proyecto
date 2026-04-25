@@ -1146,8 +1146,8 @@ def get_yahoo_price_simple(yf_ticker):
 
 def get_yahoo_klines_simple(yf_ticker, tf="5m"):
     try:
-        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d"}
-        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"1y"}
+        tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d","1w":"1wk"}
+        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"2y","1wk":"5y"}
         yf_tf  = tf_map.get(tf,"5m")
         period = per_map.get(yf_tf,"5d")
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
@@ -1205,6 +1205,19 @@ def ext_tickers():
         except:
             result[sym] = {"price":0,"change":0,"category":info["cat"],"signal":"WAIT","confidence":50,"ml_score":50}
     return jsonify(result)
+
+@app.route("/api/alert_price", methods=["POST"])
+def alert_price():
+    try:
+        d = request.json
+        pair = d.get("pair","")
+        price = d.get("price",0)
+        current = d.get("current",0)
+        msg = f"🔔 <b>ALERTA DE PRECIO</b>\n{pair}\nNivel: <b>${price:,.4f}</b>\nPrecio actual: ${current:,.4f}"
+        send_telegram(msg)
+        return jsonify({"ok":True})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)})
 
 @app.route("/api/categories")
 def categories():
