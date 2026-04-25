@@ -735,7 +735,13 @@ def analyze_local(pair):
         "signal": sig, "confidence": conf, "entry": price,
         "sl": sl, "tp": tp, "trailing_sl": trail, "rr": 2.0, "lot": lot,
         "trend": trend, "strength": "MODERADO",
-        "reasoning": f"ML Score {ml.get('ml_score',50)}/100. RSI {rsi:.0f}. Análisis local.",
+        "reasoning": (
+            f"{'🟢 SEÑAL ALCISTA' if sig=='BUY' else '🔴 SEÑAL BAJISTA' if sig=='SELL' else '⏳ MERCADO LATERAL'}. "
+            f"RSI {rsi:.0f} {'(sobrevendido)' if rsi<35 else '(sobrecomprado)' if rsi>65 else '(neutral)'}. "
+            f"EMA {'alcista 9>21>50' if ind.get('ema9',0)>ind.get('ema21',0)>ind.get('ema50',0) else 'bajista 9<21<50' if ind.get('ema9',0)<ind.get('ema21',0)<ind.get('ema50',0) else 'mixta'}. "
+            f"MACD {'positivo' if ind.get('macd',{}).get('hist',0)>0 else 'negativo'}. "
+            f"ML Score {ml.get('ml_score',50)}/100 — {'Alta' if ml.get('ml_score',50)>=65 else 'Media' if ml.get('ml_score',50)>=45 else 'Baja'} convicción."
+        ),
         "key_support": sl, "key_resistance": tp,
         "news_impact": "NEUTRAL", "whale_alert": False, "warnings": []
     }
