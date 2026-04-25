@@ -767,20 +767,23 @@ function drawCandles(candles) {
   const wrap=document.getElementById("chartWrap");
   const cv=document.getElementById("candleCanvas");
   const ov=document.getElementById("overlayCanvas");
+  const dpr=window.devicePixelRatio||1;
   const W=wrap.clientWidth,H=wrap.clientHeight;
-  cv.width=W;cv.height=H;ov.width=W;ov.height=H;
-  const ctx=cv.getContext("2d");ctx.clearRect(0,0,W,H);
-
-  const pad={top:16,bottom:28,left:6,right:70};
-  const cW=W-pad.left-pad.right,cH=H-pad.top-pad.bottom;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+"px";cv.style.height=H+"px";
+  ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+"px";ov.style.height=H+"px";
+  const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const pad={top:12,bottom:30,left:0,right:75};
+  const volH=Math.floor(H*0.12);
+  const cW=W-pad.left-pad.right;
+  const cH=H-pad.top-pad.bottom-volH-4;
   const prices=candles.flatMap(c=>[c.high,c.low]);
   const minP=Math.min(...prices),maxP=Math.max(...prices);
-  const rng=maxP-minP||1,pdd=rng*0.05;
+  const rng=maxP-minP||1,pdd=rng*0.06;
   const lo=minP-pdd,hi=maxP+pdd;
   const toY=p=>pad.top+cH-((p-lo)/(hi-lo))*cH;
   const n=candles.length;
   const gap=cW/n;
-  const cw=Math.max(1,Math.floor(gap*0.8));
+  const cw=Math.min(Math.max(1,Math.floor(gap*0.85)),gap-0.5);
 
   // Background grid
   // Fondo
