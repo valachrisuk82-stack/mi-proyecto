@@ -665,19 +665,13 @@ def update_all():
             for sup in sr.get("support", []):
                 key = f"{pair}_S_{round(sup,2)}"
                 if abs(price - sup) <= tol and key not in prev_alerts:
-                    msg = f"🟢 <b>SOPORTE TOCADO</b>
-{pair} @ <b>${price:,.4f}</b>
-Soporte: ${sup:,.4f}
-ATR: {atr:.4f}"
+                    msg = f"🟢 <b>SOPORTE TOCADO</b>\n{pair} @ <b>${price:,.4f}</b>\nSoporte: ${sup:,.4f}\nATR: {atr:.4f}"
                     send_telegram(msg)
                     prev_alerts[key] = datetime.now()
             for res in sr.get("resistance", []):
                 key = f"{pair}_R_{round(res,2)}"
                 if abs(price - res) <= tol and key not in prev_alerts:
-                    msg = f"🔴 <b>RESISTENCIA TOCADA</b>
-{pair} @ <b>${price:,.4f}</b>
-Resistencia: ${res:,.4f}
-ATR: {atr:.4f}"
+                    msg = f"🔴 <b>RESISTENCIA TOCADA</b>\n{pair} @ <b>${price:,.4f}</b>\nResistencia: ${res:,.4f}\nATR: {atr:.4f}"
                     send_telegram(msg)
                     prev_alerts[key] = datetime.now()
             # Limpiar alertas viejas (>2h)
