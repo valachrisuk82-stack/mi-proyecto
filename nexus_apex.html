@@ -430,7 +430,8 @@ canvas{position:absolute;top:0;left:0}
       <button class="analyze-btn" id="analyzeBtn" onclick="runAI()">▶ ANALIZAR CON IA</button><span id="aiSpin" style="display:none;margin-left:6px">⏳</span>
       <div id="aiWarn" style="display:none;color:var(--dn);font-size:10px;margin-top:4px"></div>
       <div id="aiWhale" style="display:none;color:var(--gold);font-size:10px;margin-top:4px">🐋 Actividad ballena detectada</div>
-      <button class="mtf-btn" id="mtfBtn2" onclick="runMTF()" style="margin-top:5px">⬡ ANALIZAR MULTI-TIMEFRAME</button><span id="mtfStatus" style="font-size:9px;color:var(--text3);margin-left:6px"></span>
+      <button class="mtf-btn" id="mtfBtn2" onclick="runMTF()" style="margin-top:5px">⬡ ANALIZAR MULTI-TIMEFRAME</button>
+      <button class="mtf-btn" onclick="showPrediction(this)" style="margin-top:4px;border-color:rgba(168,85,247,0.4);color:#a855f7">🔮 PREDECIR PRECIO</button><span id="mtfStatus" style="font-size:9px;color:var(--text3);margin-left:6px"></span>
       <div class="upd-bar" style="margin-top:8px;padding:4px 0">
         <span>UPD: <span id="updTime">--</span></span>
         <span class="upd-real" id="dataSource">DEMO</span>
@@ -1101,7 +1102,11 @@ async function runAI(){
   document.getElementById("aiSpin").style.display="inline-block";
   const pair=S.pair;let result;
   if(S.serverOk){
-    try{const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST"});const d=await r.json();if(d.ok)result=d.result;else throw new Error(d.error);}
+    try{
+      const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST",signal:AbortSignal.timeout(8000)});
+      const d=await r.json();
+      if(d.ok)result=d.result;else throw new Error(d.error);
+    }
     catch(e){localAI(pair);done();return;}
   }else{localAI(pair);done();return;}
   if(result)applyResult(result,pair);
@@ -1230,6 +1235,35 @@ function showAlert(pair,signal){
   div.className=`alert-flash ${signal}`;
   div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
   document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
+}
+
+
+async function showPrediction(btn) {
+  const pair = S.pair || "BTCUSDT";
+  if(btn) btn.textContent = "⏳ Calculando...";
+  try {
+    const r = await fetch(API_BASE + "/predict/" + pair);
+    const d = await r.json();
+    if(d.error) { if(btn) btn.textContent="🔮 PREDECIR PRECIO"; return; }
+    const dirColor = d.direction==="ALCISTA"?"#10b981":d.direction==="BAJISTA"?"#f43f5e":"#f59e0b";
+    let predDiv = document.getElementById("predPanel");
+    if(!predDiv){
+      predDiv = document.createElement("div");
+      predDiv.id = "predPanel";
+      predDiv.style.cssText = "grid-column:1/-1;padding:8px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:6px;margin-top:4px;font-size:9px;font-family:JetBrains Mono,monospace";
+      document.querySelector(".mtf-grid").appendChild(predDiv);
+    }
+    predDiv.innerHTML = `
+      <div style="color:#a855f7;font-weight:700;letter-spacing:1px;margin-bottom:5px">🔮 PREDICCIÓN ${pair}</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#64748b">DIRECCIÓN</span><span style="color:${dirColor};font-weight:700">${d.direction}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:#64748b">CONFIANZA</span><span style="color:#f59e0b">${d.confidence}%</span></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:4px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#64748b">1H</span><span style="color:${d.predictions['1h']>=d.current?'#10b981':'#f43f5e'}">${d.predictions['1h'].toLocaleString()}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#64748b">4H</span><span style="color:${d.predictions['4h']>=d.current?'#10b981':'#f43f5e'}">${d.predictions['4h'].toLocaleString()}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#64748b">24H</span><span style="color:${d.predictions['24h']>=d.current?'#10b981':'#f43f5e'}">${d.predictions['24h'].toLocaleString()}</span></div>
+      </div>`;
+  } catch(e) {}
+  if(btn) btn.textContent = "🔮 PREDECIR PRECIO";
 }
 
 function toggleAiPanel(){

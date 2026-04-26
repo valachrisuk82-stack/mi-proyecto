@@ -1216,6 +1216,64 @@ def alert_price():
     except Exception as e:
         return jsonify({"ok":False,"error":str(e)})
 
+
+@app.route("/api/predict/<symbol>")
+def predict_price(symbol):
+    try:
+        ind = cache["indicators"].get(symbol, {})
+        ticker = cache["tickers"].get(symbol, {})
+        price = float(ticker.get("lastPrice", 0))
+        if not price:
+            return jsonify({"error": "no price"})
+        
+        rsi = ind.get("rsi", 50)
+        macd = ind.get("macd", {})
+        macd_hist = macd.get("hist", 0) if isinstance(macd, dict) else 0
+        ema9 = ind.get("ema9", price)
+        ema21 = ind.get("ema21", price)
+        atr = ind.get("atr", price * 0.01)
+        ml = cache["signals"].get(symbol, {})
+        ml_score = ml.get("ml_score", 50)
+        signal = ml.get("signal", "WAIT")
+
+        # Predicción simple basada en indicadores
+        bias = 0
+        if rsi < 35: bias += 1.5
+        elif rsi > 65: bias -= 1.5
+        if macd_hist > 0: bias += 1
+        elif macd_hist < 0: bias -= 1
+        if ema9 > ema21: bias += 1
+        elif ema9 < ema21: bias -= 1
+        if ml_score > 65: bias += 1.5
+        elif ml_score < 35: bias -= 1.5
+
+        # Calcular niveles predichos
+        factor = bias / 10
+        p1h = round(price * (1 + factor * 0.003), 4)
+        p4h = round(price * (1 + factor * 0.008), 4)
+        p24h = round(price * (1 + factor * 0.02), 4)
+        
+        direction = "ALCISTA" if bias > 0 else "BAJISTA" if bias < 0 else "LATERAL"
+        confidence = min(95, max(30, 50 + abs(bias) * 8))
+
+        return jsonify({
+            "symbol": symbol,
+            "current": price,
+            "direction": direction,
+            "confidence": round(confidence),
+            "bias": round(bias, 2),
+            "predictions": {
+                "1h": p1h,
+                "4h": p4h,
+                "24h": p24h
+            },
+            "atr": round(atr, 4),
+            "support": round(price - atr * 1.5, 4),
+            "resistance": round(price + atr * 1.5, 4)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
