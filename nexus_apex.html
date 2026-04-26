@@ -115,7 +115,11 @@ html,body{height:100vh;overflow:hidden;background:var(--void);color:var(--text);
 .ptag.bear{background:rgba(255,0,85,0.08);color:var(--neon-dn);border:1px solid rgba(255,0,85,0.3);box-shadow:0 0 6px rgba(255,0,85,0.1)}
 .ptag.neutral{background:rgba(255,230,0,0.07);color:var(--neon-gold);border:1px solid rgba(255,230,0,0.25)}
 .pnone{font-size:9px;color:var(--text3);letter-spacing:1px}
-.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:302px}
+.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:462px}
+.indicator-panels{position:absolute;left:0;right:0;display:flex;flex-direction:column;gap:0;background:var(--void);border-top:1px solid rgba(0,255,136,0.1)}
+.ind-panel{position:relative;overflow:hidden;border-top:1px solid rgba(255,255,255,0.04)}
+.ind-panel-label{position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:"JetBrains Mono",monospace;letter-spacing:1px;z-index:2}
+.ind-panel-value{position:absolute;top:3px;left:50px;font-size:8px;font-family:"JetBrains Mono",monospace;z-index:2}
 canvas{position:absolute;top:0;left:0}
 .ml-overlay{position:absolute;top:10px;left:12px;background:rgba(2,3,10,0.92);border:1px solid rgba(0,255,136,0.25);border-radius:7px;padding:8px 12px;pointer-events:none;z-index:5;box-shadow:0 0 20px rgba(0,255,136,0.1)}
 .ml-ov-label{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
@@ -329,6 +333,8 @@ canvas{position:absolute;top:0;left:0}
       <span style="color:var(--text3);font-size:9px">ATR</span><span id="ioAtr" style="color:var(--text2)">--</span>
       <span style="color:var(--text3);font-size:9px">Vol</span><span id="ioVol" style="color:var(--text2)">--</span>
       <span style="color:var(--text3);font-size:9px">B/S</span><span id="ioFlow" style="color:var(--up)">--</span>
+      <span style="color:var(--text3);font-size:9px">ML</span><span id="mlScore" style="color:var(--gold);font-weight:700;font-size:10px">--</span>
+      <div id="mlFill" style="display:none"></div>
       <span id="rpBadge" style="color:var(--up);margin-left:auto;font-size:9px">● REAL</span>
     </div>
     <!-- PATTERNS -->
@@ -342,14 +348,25 @@ canvas{position:absolute;top:0;left:0}
       <canvas id="overlayCanvas" style="pointer-events:none"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
 
-      <div class="ml-overlay">
-        <div class="ml-ov-label">ML Score</div>
-        <div class="ml-ov-score" id="mlScore" style="color:var(--gold)">--</div>
-        <div class="ml-ov-bar"><div class="ml-ov-fill" id="mlFill" style="width:0%;background:var(--gold)"></div></div>
-      </div>
+
 
     </div>
 
+    <!-- INDICATOR PANELS -->
+    <div style="position:absolute;left:220px;right:0;bottom:302px;background:#0a0e1a;z-index:10" id="indPanels">
+      <!-- RSI PANEL -->
+      <div style="height:80px;position:relative;border-top:1px solid rgba(0,255,136,0.1);overflow:hidden">
+        <span style="position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace;z-index:2;letter-spacing:1px">RSI(14)</span>
+        <span id="rsiPanelVal" style="position:absolute;top:3px;left:58px;font-size:8px;font-family:'JetBrains Mono',monospace;z-index:2;color:var(--gold)">--</span>
+        <canvas id="rsiCanvas" style="width:100%;height:100%"></canvas>
+      </div>
+      <!-- MACD PANEL -->
+      <div style="height:80px;position:relative;border-top:1px solid rgba(0,255,136,0.1);overflow:hidden">
+        <span style="position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace;z-index:2;letter-spacing:1px">MACD</span>
+        <span id="macdPanelVal" style="position:absolute;top:3px;left:52px;font-size:8px;font-family:'JetBrains Mono',monospace;z-index:2;color:var(--text2)">--</span>
+        <canvas id="macdCanvas" style="width:100%;height:100%"></canvas>
+      </div>
+    </div>
     <!-- METRICS -->
     <div class="metrics">
       <div class="metric"><div class="metric-label">Stop Loss</div><div class="metric-val" id="mSl" style="color:var(--dn)">---</div><div class="metric-sub" id="mSlPct">--</div></div>
@@ -747,6 +764,150 @@ function setTF(tf, btn) {
 let S_zoom = 1.0;
 let S_zoomOffset = 0; // cuántas velas desde el final mostrar
 
+
+// ── PANELES RSI Y MACD ──
+function drawIndicatorPanels(candles) {
+  if(!candles || candles.length < 20) return;
+  const closes = candles.map(c=>c.close);
+  
+  // Calcular RSI
+  const calcRSI = (data, period=14) => {
+    let gains=0, losses=0;
+    for(let i=1;i<=period;i++){
+      const d=data[i]-data[i-1];
+      if(d>0) gains+=d; else losses-=d;
+    }
+    let avgGain=gains/period, avgLoss=losses/period;
+    const rsi=[null];
+    for(let i=1;i<period;i++) rsi.push(null);
+    rsi.push(100-(100/(1+avgGain/avgLoss)));
+    for(let i=period+1;i<data.length;i++){
+      const d=data[i]-data[i-1];
+      avgGain=(avgGain*(period-1)+(d>0?d:0))/period;
+      avgLoss=(avgLoss*(period-1)+(d<0?-d:0))/period;
+      rsi.push(avgLoss===0?100:100-(100/(1+avgGain/avgLoss)));
+    }
+    return rsi;
+  };
+
+  // Calcular MACD
+  const calcEMA = (data, period) => {
+    const k=2/(period+1); let ema=data[0];
+    return data.map(v=>{ema=v*k+ema*(1-k);return ema;});
+  };
+  const ema12=calcEMA(closes,12);
+  const ema26=calcEMA(closes,26);
+  const macdLine=ema12.map((v,i)=>v-ema26[i]);
+  const signal=calcEMA(macdLine,9);
+  const histogram=macdLine.map((v,i)=>v-signal[i]);
+
+  // Zoom igual que el gráfico principal
+  const zoomN=Math.max(10,Math.round(candles.length/S_zoom));
+  const offset=Math.max(0,candles.length-zoomN);
+  const rsiArr=calcRSI(closes).slice(offset);
+  const histArr=histogram.slice(offset);
+  const macdArr=macdLine.slice(offset);
+  const sigArr=signal.slice(offset);
+  const n=rsiArr.length;
+
+  // ── DIBUJAR RSI ──
+  const rsiCv=document.getElementById("rsiCanvas");
+  if(rsiCv){
+    const dpr=window.devicePixelRatio||1;
+    const W=rsiCv.parentElement.clientWidth, H=80;
+    rsiCv.width=W*dpr; rsiCv.height=H*dpr;
+    rsiCv.style.width=W+"px"; rsiCv.style.height=H+"px";
+    const ctx=rsiCv.getContext("2d"); ctx.scale(dpr,dpr);
+    ctx.fillStyle="#0a0e1a"; ctx.fillRect(0,0,W,H);
+    const pad={top:12,bottom:4,right:45};
+    const cW=W-pad.right; const cH=H-pad.top-pad.bottom;
+    const toY=v=>pad.top+cH-((v-0)/(100-0))*cH;
+    const gap=cW/n;
+    // Zonas sobrecompra/sobreventa
+    ctx.fillStyle="rgba(244,63,94,0.05)";
+    ctx.fillRect(0,toY(70),cW,toY(100)-toY(70));
+    ctx.fillStyle="rgba(16,185,129,0.05)";
+    ctx.fillRect(0,toY(30),cW,toY(0)-toY(30));
+    // Líneas 70/30
+    [70,50,30].forEach(lvl=>{
+      ctx.strokeStyle=lvl===50?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.1)";
+      ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(0,toY(lvl)); ctx.lineTo(cW,toY(lvl)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle="rgba(100,116,139,0.6)"; ctx.font="7px 'JetBrains Mono'";
+      ctx.fillText(lvl,cW+2,toY(lvl)+3);
+    });
+    // Línea RSI
+    ctx.strokeStyle="rgba(168,85,247,0.9)"; ctx.lineWidth=1.5; ctx.setLineDash([]);
+    ctx.beginPath();
+    rsiArr.forEach((v,i)=>{
+      if(v===null) return;
+      const x=i*gap+gap/2; const y=toY(v);
+      i===0||rsiArr[i-1]===null?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Valor actual
+    const lastRsi=rsiArr.filter(v=>v!==null).pop();
+    if(lastRsi){
+      const el=document.getElementById("rsiPanelVal");
+      if(el){el.textContent=lastRsi.toFixed(1);el.style.color=lastRsi>70?"var(--dn)":lastRsi<30?"var(--up)":"var(--gold)";}
+    }
+  }
+
+  // ── DIBUJAR MACD ──
+  const macdCv=document.getElementById("macdCanvas");
+  if(macdCv){
+    const dpr=window.devicePixelRatio||1;
+    const W=macdCv.parentElement.clientWidth, H=80;
+    macdCv.width=W*dpr; macdCv.height=H*dpr;
+    macdCv.style.width=W+"px"; macdCv.style.height=H+"px";
+    const ctx=macdCv.getContext("2d"); ctx.scale(dpr,dpr);
+    ctx.fillStyle="#0a0e1a"; ctx.fillRect(0,0,W,H);
+    const pad={top:12,bottom:4,right:45};
+    const cW=W-pad.right; const cH=H-pad.top-pad.bottom;
+    const valid=histArr.filter(v=>!isNaN(v));
+    const maxH=Math.max(...valid.map(Math.abs))||1;
+    const toY=v=>pad.top+cH/2-((v)/maxH)*(cH/2);
+    const gap=cW/n;
+    // Línea cero
+    ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0,pad.top+cH/2); ctx.lineTo(cW,pad.top+cH/2); ctx.stroke();
+    ctx.setLineDash([]);
+    // Histograma
+    histArr.forEach((v,i)=>{
+      if(isNaN(v)) return;
+      const x=i*gap; const w=Math.max(1,gap*0.8);
+      const y0=pad.top+cH/2; const y=toY(v);
+      ctx.fillStyle=v>=0?"rgba(16,185,129,0.6)":"rgba(244,63,94,0.6)";
+      ctx.fillRect(x+1,Math.min(y,y0),Math.max(1,w-1),Math.abs(y-y0)||1);
+    });
+    // Línea MACD
+    ctx.strokeStyle="rgba(59,130,246,0.9)"; ctx.lineWidth=1.2;
+    ctx.beginPath();
+    macdArr.forEach((v,i)=>{
+      if(isNaN(v)) return;
+      const x=i*gap+gap/2; const y=toY(v);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Línea signal
+    ctx.strokeStyle="rgba(251,146,60,0.9)"; ctx.lineWidth=1;
+    ctx.beginPath();
+    sigArr.forEach((v,i)=>{
+      if(isNaN(v)) return;
+      const x=i*gap+gap/2; const y=toY(v);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // Valor actual
+    const lastHist=histArr.filter(v=>!isNaN(v)).pop();
+    if(lastHist!==undefined){
+      const el=document.getElementById("macdPanelVal");
+      if(el){el.textContent=lastHist.toFixed(4);el.style.color=lastHist>=0?"var(--up)":"var(--dn)";}
+    }
+  }
+}
+
 function initZoom() {
   const wrap = document.getElementById("chartWrap");
   wrap.addEventListener("wheel", e => {
@@ -929,6 +1090,8 @@ function drawCandles(candles) {
   ctx.fillStyle="#fff";ctx.font="bold 8px 'JetBrains Mono'";
   ctx.fillText(last.toLocaleString(undefined,{maximumFractionDigits:2}),W-pad.right+3,pY+3);
 
+  // Dibujar paneles RSI y MACD
+  drawIndicatorPanels(S.candles||candles);
   // ML Score overlay
   const ml=S.mlScores[S.pair]||0;
   const mlColor=ml>=68?"var(--up)":ml<=32?"var(--dn)":"var(--gold)";
