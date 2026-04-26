@@ -115,11 +115,7 @@ html,body{height:100vh;overflow:hidden;background:var(--void);color:var(--text);
 .ptag.bear{background:rgba(255,0,85,0.08);color:var(--neon-dn);border:1px solid rgba(255,0,85,0.3);box-shadow:0 0 6px rgba(255,0,85,0.1)}
 .ptag.neutral{background:rgba(255,230,0,0.07);color:var(--neon-gold);border:1px solid rgba(255,230,0,0.25)}
 .pnone{font-size:9px;color:var(--text3);letter-spacing:1px}
-.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:462px}
-.indicator-panels{position:absolute;left:0;right:0;display:flex;flex-direction:column;gap:0;background:var(--void);border-top:1px solid rgba(0,255,136,0.1)}
-.ind-panel{position:relative;overflow:hidden;border-top:1px solid rgba(255,255,255,0.04)}
-.ind-panel-label{position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:"JetBrains Mono",monospace;letter-spacing:1px;z-index:2}
-.ind-panel-value{position:absolute;top:3px;left:50px;font-size:8px;font-family:"JetBrains Mono",monospace;z-index:2}
+.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:242px}
 canvas{position:absolute;top:0;left:0}
 .ml-overlay{position:absolute;top:10px;left:12px;background:rgba(2,3,10,0.92);border:1px solid rgba(0,255,136,0.25);border-radius:7px;padding:8px 12px;pointer-events:none;z-index:5;box-shadow:0 0 20px rgba(0,255,136,0.1)}
 .ml-ov-label{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
@@ -318,8 +314,6 @@ canvas{position:absolute;top:0;left:0}
         <button class="tf-btn" onclick="setTF('30m',this)">M30</button>
         <button class="tf-btn" onclick="setTF('1h',this)">H1</button>
         <button class="tf-btn" onclick="setTF('4h',this)">H4</button>
-        <button class="tf-btn" onclick="setTF('1d',this)">D1</button>
-        <button class="tf-btn" onclick="setTF('1w',this)">W1</button>
       </div>
     </div>
 
@@ -333,9 +327,7 @@ canvas{position:absolute;top:0;left:0}
       <span style="color:var(--text3);font-size:9px">ATR</span><span id="ioAtr" style="color:var(--text2)">--</span>
       <span style="color:var(--text3);font-size:9px">Vol</span><span id="ioVol" style="color:var(--text2)">--</span>
       <span style="color:var(--text3);font-size:9px">B/S</span><span id="ioFlow" style="color:var(--up)">--</span>
-      <span style="color:var(--text3);font-size:9px">ML</span><span id="mlScore" style="color:var(--gold);font-weight:700;font-size:10px">--</span>
-      <div id="mlFill" style="display:none"></div>
-      <span id="rpBadge" style="color:var(--up);margin-left:auto;font-size:9px">● REAL</span>
+      <span style="color:var(--text3);font-size:9px">ML</span> <span id="mlScore" style="color:var(--gold);font-weight:700;font-size:10px">--</span><span id="rpBadge" style="color:var(--up);margin-left:auto;font-size:9px">● REAL</span>
     </div>
     <!-- PATTERNS -->
     <div class="pattern-bar" id="patternBar">
@@ -348,25 +340,14 @@ canvas{position:absolute;top:0;left:0}
       <canvas id="overlayCanvas" style="pointer-events:none"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
 
-
+      <div class="ml-overlay" style="display:none">
+        <div class="ml-ov-label">ML Score</div>
+        <div class="ml-ov-score" id="mlScoreOld" style="color:var(--gold)">--</div>
+        <div class="ml-ov-bar"><div class="ml-ov-fill" id="mlFill" style="width:0%;background:var(--gold)"></div></div>
+      </div>
 
     </div>
 
-    <!-- INDICATOR PANELS -->
-    <div style="position:absolute;left:220px;right:0;bottom:302px;background:#0a0e1a;z-index:10" id="indPanels">
-      <!-- RSI PANEL -->
-      <div style="height:80px;position:relative;border-top:1px solid rgba(0,255,136,0.1);overflow:hidden">
-        <span style="position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace;z-index:2;letter-spacing:1px">RSI(14)</span>
-        <span id="rsiPanelVal" style="position:absolute;top:3px;left:58px;font-size:8px;font-family:'JetBrains Mono',monospace;z-index:2;color:var(--gold)">--</span>
-        <canvas id="rsiCanvas" style="width:100%;height:100%"></canvas>
-      </div>
-      <!-- MACD PANEL -->
-      <div style="height:80px;position:relative;border-top:1px solid rgba(0,255,136,0.1);overflow:hidden">
-        <span style="position:absolute;top:3px;left:8px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace;z-index:2;letter-spacing:1px">MACD</span>
-        <span id="macdPanelVal" style="position:absolute;top:3px;left:52px;font-size:8px;font-family:'JetBrains Mono',monospace;z-index:2;color:var(--text2)">--</span>
-        <canvas id="macdCanvas" style="width:100%;height:100%"></canvas>
-      </div>
-    </div>
     <!-- METRICS -->
     <div class="metrics">
       <div class="metric"><div class="metric-label">Stop Loss</div><div class="metric-val" id="mSl" style="color:var(--dn)">---</div><div class="metric-sub" id="mSlPct">--</div></div>
@@ -383,29 +364,9 @@ canvas{position:absolute;top:0;left:0}
 </div>
 
 <div class="ai-panel" id="aiPanel">
-  <div class="ai-panel-toggle" onclick="toggleAiPanel()" style="display:flex;align-items:center;justify-content:space-between">
+  <div class="ai-panel-toggle" onclick="toggleAiPanel()">
     <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN</span>
-    <div style="display:flex;align-items:center;gap:10px">
-      <button onclick="event.stopPropagation();toggleNews()" style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace">📰 NOTICIAS</button>
-      <button onclick="event.stopPropagation();toggleHistory()" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);color:var(--neon-up);font-size:9px;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace">📋 HISTORIAL</button>
-      <span class="ai-panel-arrow" id="panelArrow">▲</span>
-    </div>
-  </div>
-  <!-- HISTORIAL PANEL -->
-  <div id="historyPanel" style="display:none;position:absolute;bottom:302px;right:0;width:420px;background:rgba(2,3,10,0.98);border:1px solid rgba(0,255,136,0.2);border-radius:8px 0 0 8px;z-index:200;max-height:400px;overflow-y:auto">
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,255,136,0.1);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)">📋 HISTORIAL DE SEÑALES</span>
-      <button onclick="toggleHistory()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
-    </div>
-    <div id="historyList" style="padding:8px"></div>
-  </div>
-  <!-- NOTICIAS PANEL -->
-  <div id="newsPanel" style="display:none;position:absolute;bottom:302px;left:220px;width:420px;background:rgba(2,3,10,0.98);border:1px solid rgba(0,255,136,0.2);border-radius:0 8px 8px 0;z-index:200;max-height:400px;overflow-y:auto">
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,255,136,0.1);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)">📰 NOTICIAS CRYPTO</span>
-      <button onclick="toggleNews()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
-    </div>
-    <div id="newsList" style="padding:8px"></div>
+    <span class="ai-panel-arrow" id="panelArrow">▲</span>
   </div>
   <div class="ai-panel-body">
 
@@ -455,15 +416,6 @@ canvas{position:absolute;top:0;left:0}
     <!-- COL 4: CONFIG + BOTONES -->
     <div class="ai-col">
       <div class="ai-col-title">Configuración</div>
-      <div style="padding:6px 10px;border-bottom:1px solid rgba(0,255,136,0.08)">
-        <div style="font-size:9px;color:var(--text3);margin-bottom:4px;letter-spacing:1px">ALERTA DE PRECIO</div>
-        <div style="display:flex;gap:4px">
-          <input id="alertPrice" type="number" placeholder="Precio..." step="any"
-            style="flex:1;background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,136,0.2);color:var(--text1);font-size:10px;padding:4px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;width:100%">
-          <button onclick="setAlert()" style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);color:var(--neon-up);font-size:9px;padding:4px 8px;border-radius:3px;cursor:pointer;white-space:nowrap">+ SET</button>
-        </div>
-        <div id="activeAlerts" style="margin-top:4px;font-size:9px;color:var(--text3)"></div>
-      </div>
       <div class="inp-row"><label class="inp-label">Capital (USDT)</label><input class="inp" id="inpCap" type="number" value="1000"></div>
       <div class="inp-row" style="margin-bottom:10px"><label class="inp-label">Riesgo (%)</label><input class="inp" id="inpRisk" type="number" value="1" step="0.1"></div>
       <button class="analyze-btn" id="analyzeBtn" onclick="runAI()">▶ ANALIZAR CON IA</button><span id="aiSpin" style="display:none;margin-left:6px">⏳</span>
@@ -524,7 +476,7 @@ const S = {
 
 // ── BOOT ──
 window.addEventListener("DOMContentLoaded", () => {
-  buildSidebar(); startClock(); checkServer(); initCrosshair(); initZoom();
+  buildSidebar(); startClock(); checkServer(); initCrosshair();
   setInterval(checkServer, 8000);
   setInterval(fetchTickers, 7000);
   setInterval(fetchExtTickers, 15000);
@@ -759,165 +711,6 @@ function setTF(tf, btn) {
 
 // ── CHART ──
 
-
-// ── ZOOM CON SCROLL ──
-let S_zoom = 1.0;
-let S_zoomOffset = 0; // cuántas velas desde el final mostrar
-
-
-// ── PANELES RSI Y MACD ──
-function drawIndicatorPanels(candles) {
-  if(!candles || candles.length < 20) return;
-  const closes = candles.map(c=>c.close);
-  
-  // Calcular RSI
-  const calcRSI = (data, period=14) => {
-    let gains=0, losses=0;
-    for(let i=1;i<=period;i++){
-      const d=data[i]-data[i-1];
-      if(d>0) gains+=d; else losses-=d;
-    }
-    let avgGain=gains/period, avgLoss=losses/period;
-    const rsi=[null];
-    for(let i=1;i<period;i++) rsi.push(null);
-    rsi.push(100-(100/(1+avgGain/avgLoss)));
-    for(let i=period+1;i<data.length;i++){
-      const d=data[i]-data[i-1];
-      avgGain=(avgGain*(period-1)+(d>0?d:0))/period;
-      avgLoss=(avgLoss*(period-1)+(d<0?-d:0))/period;
-      rsi.push(avgLoss===0?100:100-(100/(1+avgGain/avgLoss)));
-    }
-    return rsi;
-  };
-
-  // Calcular MACD
-  const calcEMA = (data, period) => {
-    const k=2/(period+1); let ema=data[0];
-    return data.map(v=>{ema=v*k+ema*(1-k);return ema;});
-  };
-  const ema12=calcEMA(closes,12);
-  const ema26=calcEMA(closes,26);
-  const macdLine=ema12.map((v,i)=>v-ema26[i]);
-  const signal=calcEMA(macdLine,9);
-  const histogram=macdLine.map((v,i)=>v-signal[i]);
-
-  // Zoom igual que el gráfico principal
-  const zoomN=Math.max(10,Math.round(candles.length/S_zoom));
-  const offset=Math.max(0,candles.length-zoomN);
-  const rsiArr=calcRSI(closes).slice(offset);
-  const histArr=histogram.slice(offset);
-  const macdArr=macdLine.slice(offset);
-  const sigArr=signal.slice(offset);
-  const n=rsiArr.length;
-
-  // ── DIBUJAR RSI ──
-  const rsiCv=document.getElementById("rsiCanvas");
-  if(rsiCv){
-    const dpr=window.devicePixelRatio||1;
-    const W=rsiCv.parentElement.clientWidth, H=80;
-    rsiCv.width=W*dpr; rsiCv.height=H*dpr;
-    rsiCv.style.width=W+"px"; rsiCv.style.height=H+"px";
-    const ctx=rsiCv.getContext("2d"); ctx.scale(dpr,dpr);
-    ctx.fillStyle="#0a0e1a"; ctx.fillRect(0,0,W,H);
-    const pad={top:12,bottom:4,right:45};
-    const cW=W-pad.right; const cH=H-pad.top-pad.bottom;
-    const toY=v=>pad.top+cH-((v-0)/(100-0))*cH;
-    const gap=cW/n;
-    // Zonas sobrecompra/sobreventa
-    ctx.fillStyle="rgba(244,63,94,0.05)";
-    ctx.fillRect(0,toY(70),cW,toY(100)-toY(70));
-    ctx.fillStyle="rgba(16,185,129,0.05)";
-    ctx.fillRect(0,toY(30),cW,toY(0)-toY(30));
-    // Líneas 70/30
-    [70,50,30].forEach(lvl=>{
-      ctx.strokeStyle=lvl===50?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.1)";
-      ctx.lineWidth=1; ctx.setLineDash([3,3]);
-      ctx.beginPath(); ctx.moveTo(0,toY(lvl)); ctx.lineTo(cW,toY(lvl)); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle="rgba(100,116,139,0.6)"; ctx.font="7px 'JetBrains Mono'";
-      ctx.fillText(lvl,cW+2,toY(lvl)+3);
-    });
-    // Línea RSI
-    ctx.strokeStyle="rgba(168,85,247,0.9)"; ctx.lineWidth=1.5; ctx.setLineDash([]);
-    ctx.beginPath();
-    rsiArr.forEach((v,i)=>{
-      if(v===null) return;
-      const x=i*gap+gap/2; const y=toY(v);
-      i===0||rsiArr[i-1]===null?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    });
-    ctx.stroke();
-    // Valor actual
-    const lastRsi=rsiArr.filter(v=>v!==null).pop();
-    if(lastRsi){
-      const el=document.getElementById("rsiPanelVal");
-      if(el){el.textContent=lastRsi.toFixed(1);el.style.color=lastRsi>70?"var(--dn)":lastRsi<30?"var(--up)":"var(--gold)";}
-    }
-  }
-
-  // ── DIBUJAR MACD ──
-  const macdCv=document.getElementById("macdCanvas");
-  if(macdCv){
-    const dpr=window.devicePixelRatio||1;
-    const W=macdCv.parentElement.clientWidth, H=80;
-    macdCv.width=W*dpr; macdCv.height=H*dpr;
-    macdCv.style.width=W+"px"; macdCv.style.height=H+"px";
-    const ctx=macdCv.getContext("2d"); ctx.scale(dpr,dpr);
-    ctx.fillStyle="#0a0e1a"; ctx.fillRect(0,0,W,H);
-    const pad={top:12,bottom:4,right:45};
-    const cW=W-pad.right; const cH=H-pad.top-pad.bottom;
-    const valid=histArr.filter(v=>!isNaN(v));
-    const maxH=Math.max(...valid.map(Math.abs))||1;
-    const toY=v=>pad.top+cH/2-((v)/maxH)*(cH/2);
-    const gap=cW/n;
-    // Línea cero
-    ctx.strokeStyle="rgba(255,255,255,0.1)"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.moveTo(0,pad.top+cH/2); ctx.lineTo(cW,pad.top+cH/2); ctx.stroke();
-    ctx.setLineDash([]);
-    // Histograma
-    histArr.forEach((v,i)=>{
-      if(isNaN(v)) return;
-      const x=i*gap; const w=Math.max(1,gap*0.8);
-      const y0=pad.top+cH/2; const y=toY(v);
-      ctx.fillStyle=v>=0?"rgba(16,185,129,0.6)":"rgba(244,63,94,0.6)";
-      ctx.fillRect(x+1,Math.min(y,y0),Math.max(1,w-1),Math.abs(y-y0)||1);
-    });
-    // Línea MACD
-    ctx.strokeStyle="rgba(59,130,246,0.9)"; ctx.lineWidth=1.2;
-    ctx.beginPath();
-    macdArr.forEach((v,i)=>{
-      if(isNaN(v)) return;
-      const x=i*gap+gap/2; const y=toY(v);
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    });
-    ctx.stroke();
-    // Línea signal
-    ctx.strokeStyle="rgba(251,146,60,0.9)"; ctx.lineWidth=1;
-    ctx.beginPath();
-    sigArr.forEach((v,i)=>{
-      if(isNaN(v)) return;
-      const x=i*gap+gap/2; const y=toY(v);
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    });
-    ctx.stroke();
-    // Valor actual
-    const lastHist=histArr.filter(v=>!isNaN(v)).pop();
-    if(lastHist!==undefined){
-      const el=document.getElementById("macdPanelVal");
-      if(el){el.textContent=lastHist.toFixed(4);el.style.color=lastHist>=0?"var(--up)":"var(--dn)";}
-    }
-  }
-}
-
-function initZoom() {
-  const wrap = document.getElementById("chartWrap");
-  wrap.addEventListener("wheel", e => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    S_zoom = Math.min(Math.max(0.2, S_zoom + delta), 3.0);
-    if(S.candles && S.candles.length) drawCandles(S.candles);
-  }, {passive: false});
-}
-
 function initCrosshair() {
   const wrap = document.getElementById("chartWrap");
   const ch = document.getElementById("crosshairCanvas");
@@ -963,27 +756,22 @@ function drawCandles(candles) {
   const wrap=document.getElementById("chartWrap");
   const cv=document.getElementById("candleCanvas");
   const ov=document.getElementById("overlayCanvas");
-  const dpr=window.devicePixelRatio||1;
   const W=wrap.clientWidth,H=wrap.clientHeight;
+  const dpr=window.devicePixelRatio||2;
   cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+"px";cv.style.height=H+"px";
   ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+"px";ov.style.height=H+"px";
   const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
-  const pad={top:12,bottom:30,left:0,right:75};
-  const volH=Math.floor(H*0.12);
-  const cW=W-pad.left-pad.right;
-  const cH=H-pad.top-pad.bottom-volH-4;
+
+  const pad={top:16,bottom:28,left:6,right:70};
+  const cW=W-pad.left-pad.right,cH=H-pad.top-pad.bottom;
   const prices=candles.flatMap(c=>[c.high,c.low]);
   const minP=Math.min(...prices),maxP=Math.max(...prices);
-  const rng=maxP-minP||1,pdd=rng*0.06;
+  const rng=maxP-minP||1,pdd=rng*0.05;
   const lo=minP-pdd,hi=maxP+pdd;
   const toY=p=>pad.top+cH-((p-lo)/(hi-lo))*cH;
-  // Aplicar zoom
-  const zoomN=Math.max(10,Math.round(candles.length/S_zoom));
-  const visCandles=candles.slice(Math.max(0,candles.length-zoomN));
-  const n=visCandles.length;
+  const n=candles.length;
   const gap=cW/n;
-  const cw=Math.min(Math.max(1,Math.floor(gap*0.85)),gap-0.5);
-  candles=visCandles;
+  const cw=Math.max(1,Math.floor(gap*0.8));
 
   // Background grid
   // Fondo
@@ -1090,8 +878,6 @@ function drawCandles(candles) {
   ctx.fillStyle="#fff";ctx.font="bold 8px 'JetBrains Mono'";
   ctx.fillText(last.toLocaleString(undefined,{maximumFractionDigits:2}),W-pad.right+3,pY+3);
 
-  // Dibujar paneles RSI y MACD
-  drawIndicatorPanels(S.candles||candles);
   // ML Score overlay
   const ml=S.mlScores[S.pair]||0;
   const mlColor=ml>=68?"var(--up)":ml<=32?"var(--dn)":"var(--gold)";
@@ -1348,128 +1134,6 @@ function showAlert(pair,signal){
   div.className=`alert-flash ${signal}`;
   div.innerHTML=`<span>${signal==="BUY"?"▲":"▼"}</span><strong>${pair.replace("USDT","")}</strong> — ${signal}`;
   document.body.appendChild(div);setTimeout(()=>div.remove(),3200);
-}
-
-
-// ── ALERTAS DE PRECIO PERSONALIZADAS ──
-let S_priceAlerts = [];
-
-function setAlert() {
-  const input = document.getElementById("alertPrice");
-  const price = parseFloat(input.value);
-  if(!price || isNaN(price)) return;
-  const pair = S.pair || "BTCUSDT";
-  S_priceAlerts.push({pair, price, triggered: false});
-  input.value = "";
-  renderAlerts();
-  showAlert(pair, "ALERTA SET @ $"+price.toLocaleString());
-}
-
-function renderAlerts() {
-  const el = document.getElementById("activeAlerts");
-  if(!el) return;
-  if(!S_priceAlerts.length) { el.innerHTML="Sin alertas activas"; return; }
-  el.innerHTML = S_priceAlerts.map((a,i) =>
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">
-      <span>${a.pair} @ $${a.price.toLocaleString()}</span>
-      <button onclick="S_priceAlerts.splice(${i},1);renderAlerts()" style="background:none;border:none;color:var(--dn);cursor:pointer;font-size:10px">✕</button>
-    </div>`
-  ).join("");
-}
-
-function checkPriceAlerts() {
-  S_priceAlerts.forEach(a => {
-    if(a.triggered) return;
-    const t = S.tickers[a.pair];
-    if(!t) return;
-    const price = t.price || 0;
-    const diff = Math.abs(price - a.price) / a.price * 100;
-    if(diff < 0.1) { // dentro del 0.1%
-      a.triggered = true;
-      showAlert(a.pair, "🔔 ALERTA: $"+a.price.toLocaleString()+" TOCADO!");
-      // Enviar a Telegram via servidor
-      fetch(API_BASE+"/alert_price", {method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({pair:a.pair, price:a.price, current:price})});
-    }
-  });
-}
-setInterval(checkPriceAlerts, 5000);
-
-
-function toggleNews() {
-  const panel = document.getElementById("newsPanel");
-  if(panel.style.display === "none") {
-    panel.style.display = "block";
-    fetchNews();
-  } else {
-    panel.style.display = "none";
-  }
-}
-
-async function fetchNews() {
-  const list = document.getElementById("newsList");
-  list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Cargando noticias...</div>';
-  try {
-    const pair = S.pair || "BTCUSDT";
-    const r = await fetch(API_BASE + "/news/" + pair);
-    const d = await r.json();
-    const headlines = d.headlines || [];
-    const label = d.label || "NEUTRAL";
-    const score = d.score || 0;
-    const labelColor = score>1?"var(--up)":score<-1?"var(--dn)":"var(--gold)";
-    if(!headlines.length) {
-      list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Sin noticias disponibles</div>';
-      return;
-    }
-    list.innerHTML = `
-      <div style="padding:6px 8px;margin-bottom:4px;display:flex;align-items:center;gap:8px">
-        <span style="font-size:9px;color:var(--text3)">SENTIMIENTO:</span>
-        <span style="color:${labelColor};font-weight:700;font-size:10px">${label}</span>
-        <span style="color:var(--text3);font-size:9px">Score: ${score}</span>
-      </div>
-      ${headlines.map(h=>`
-        <div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:10px;color:var(--text2);line-height:1.4;font-family:'JetBrains Mono',monospace">
-          📄 ${h}
-        </div>`).join("")}`;
-  } catch(e) {
-    list.innerHTML = '<div style="color:var(--dn);font-size:10px;padding:10px">Error cargando noticias</div>';
-  }
-}
-function toggleHistory() {
-  const panel = document.getElementById("historyPanel");
-  if(panel.style.display === "none") {
-    panel.style.display = "block";
-    fetchHistory();
-  } else {
-    panel.style.display = "none";
-  }
-}
-
-async function fetchHistory() {
-  try {
-    const r = await fetch(API_BASE + "/history");
-    const data = await r.json();
-    const list = document.getElementById("historyList");
-    if(!data.length) {
-      list.innerHTML = '<div style="color:var(--text3);font-size:10px;text-align:center;padding:20px">Sin señales todavía</div>';
-      return;
-    }
-    list.innerHTML = data.map(h => {
-      const col = h.signal==="BUY" ? "var(--up)" : h.signal==="SELL" ? "var(--dn)" : "var(--gold)";
-      const src = h.source==="AI" ? "🤖" : h.source==="AUTO" ? "⚡" : "👤";
-      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'JetBrains Mono',monospace;font-size:10px">
-        <span style="color:var(--text3);min-width:42px">${h.time}</span>
-        <span style="color:var(--text2);min-width:90px;font-size:9px">${h.pair}</span>
-        <span style="color:${col};font-weight:700;min-width:36px">${h.signal}</span>
-        <span style="color:var(--gold);min-width:32px">${h.confidence}%</span>
-        <span style="color:var(--text2);min-width:70px">$${parseFloat(h.price).toLocaleString(undefined,{maximumFractionDigits:4})}</span>
-        <span style="color:var(--text3);min-width:36px">ML:${h.ml_score}</span>
-        <span style="font-size:12px">${src}</span>
-      </div>`;
-    }).join("");
-  } catch(e) {
-    document.getElementById("historyList").innerHTML = '<div style="color:var(--dn);font-size:10px;padding:10px">Error cargando historial</div>';
-  }
 }
 
 function toggleAiPanel(){
