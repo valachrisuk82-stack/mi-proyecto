@@ -109,6 +109,8 @@ html,body{height:100vh;overflow:hidden;background:var(--void);color:var(--text);
 .tf-btn{padding:3px 9px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);border-radius:4px;background:none;color:var(--text3);cursor:pointer;transition:all .15s;letter-spacing:0.5px}
 .tf-btn:hover{border-color:var(--neon-up);color:var(--neon-up);box-shadow:0 0 8px rgba(0,255,136,0.2)}
 .tf-btn.on{background:var(--neon-up);border-color:var(--neon-up);color:#02030a;font-weight:800;box-shadow:0 0 16px rgba(0,255,136,0.5)}
+.draw-btn{padding:3px 8px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:none;color:var(--text3);cursor:pointer;transition:all .15s}
+.draw-btn:hover,.draw-btn.on{border-color:var(--gold);color:var(--gold);background:rgba(251,191,36,0.1)}
 .pattern-bar{padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;min-height:28px;flex-wrap:wrap}
 .ptag{padding:2px 7px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:1px}
 .ptag.bull{background:rgba(0,255,136,0.08);color:var(--neon-up);border:1px solid rgba(0,255,136,0.3);box-shadow:0 0 6px rgba(0,255,136,0.1)}
@@ -307,7 +309,14 @@ canvas{position:absolute;top:0;left:0}
         <span>WHALE: <span id="chWhale">--</span></span>
         <span>BUY/SELL: <span id="chFlow">--</span></span>
       </div>
-      <div class="ch-tf">
+      <div style="display:flex;gap:3px;margin-right:8px;border-right:1px solid var(--border);padding-right:8px">
+          <button class="draw-btn" id="drawNone" onclick="setDrawTool('none')" title="Cursor">✦</button>
+          <button class="draw-btn" id="drawLine" onclick="setDrawTool('line')" title="Línea">╱</button>
+          <button class="draw-btn" id="drawHLine" onclick="setDrawTool('hline')" title="Línea horizontal">—</button>
+          <button class="draw-btn" id="drawRect" onclick="setDrawTool('rect')" title="Rectángulo">▭</button>
+          <button class="draw-btn" onclick="clearDrawings()" title="Borrar todo">🗑</button>
+        </div>
+        <div class="ch-tf">
         <button class="tf-btn on" onclick="setTF('1m',this)">M1</button>
         <button class="tf-btn" onclick="setTF('5m',this)">M5</button>
         <button class="tf-btn" onclick="setTF('15m',this)">M15</button>
@@ -337,7 +346,7 @@ canvas{position:absolute;top:0;left:0}
     <!-- CHART -->
     <div class="chart-wrap" id="chartWrap">
       <canvas id="candleCanvas"></canvas>
-      <canvas id="overlayCanvas" style="pointer-events:none"></canvas>
+      <canvas id="overlayCanvas" style="pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
 
       <div class="ml-overlay" style="display:none">
@@ -476,7 +485,7 @@ const S = {
 
 // ── BOOT ──
 window.addEventListener("DOMContentLoaded", () => {
-  buildSidebar(); startClock(); checkServer(); initCrosshair();
+  buildSidebar(); startClock(); checkServer(); initCrosshair(); initDrawing();
   setInterval(checkServer, 8000);
   setInterval(fetchTickers, 7000);
   setInterval(fetchExtTickers, 15000);
@@ -710,6 +719,93 @@ function setTF(tf, btn) {
 }
 
 // ── CHART ──
+
+
+// ── HERRAMIENTAS DE DIBUJO ──
+let S_drawTool = 'none';
+let S_drawings = [];
+let S_drawing = null;
+let S_drawStart = null;
+
+function setDrawTool(tool) {
+  S_drawTool = tool;
+  document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('on'));
+  const el = document.getElementById('draw' + tool.charAt(0).toUpperCase() + tool.slice(1));
+  if(el) el.classList.add('on');
+  const ov = document.getElementById('overlayCanvas');
+  ov.style.pointerEvents = tool === 'none' ? 'none' : 'auto';
+  ov.style.cursor = 'crosshair';
+}
+
+function clearDrawings() {
+  S_drawings = [];
+  redrawDrawings();
+}
+
+function getChartCoords(e) {
+  const ov = document.getElementById('overlayCanvas');
+  const rect = ov.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function initDrawing() {
+  const ov = document.getElementById('overlayCanvas');
+  
+  ov.addEventListener('mousedown', e => {
+    if(S_drawTool === 'none') return;
+    S_drawStart = getChartCoords(e);
+    S_drawing = { tool: S_drawTool, x1: S_drawStart.x, y1: S_drawStart.y, x2: S_drawStart.x, y2: S_drawStart.y };
+  });
+
+  ov.addEventListener('mousemove', e => {
+    if(!S_drawing) return;
+    const pos = getChartCoords(e);
+    S_drawing.x2 = pos.x;
+    S_drawing.y2 = S_drawing.tool === 'hline' ? S_drawing.y1 : pos.y;
+    redrawDrawings(S_drawing);
+  });
+
+  ov.addEventListener('mouseup', e => {
+    if(!S_drawing) return;
+    S_drawings.push({...S_drawing});
+    S_drawing = null;
+    redrawDrawings();
+  });
+}
+
+function redrawDrawings(preview) {
+  const ov = document.getElementById('overlayCanvas');
+  const ctx = ov.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, ov.width, ov.height);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  const allDrawings = preview ? [...S_drawings, preview] : S_drawings;
+  
+  allDrawings.forEach(d => {
+    ctx.strokeStyle = 'rgba(251,191,36,0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    if(d.tool === 'line') {
+      ctx.moveTo(d.x1, d.y1);
+      ctx.lineTo(d.x2, d.y2);
+      ctx.stroke();
+    } else if(d.tool === 'hline') {
+      ctx.setLineDash([6,3]);
+      ctx.moveTo(0, d.y1);
+      ctx.lineTo(ov.width/dpr, d.y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else if(d.tool === 'rect') {
+      ctx.strokeRect(d.x1, d.y1, d.x2-d.x1, d.y2-d.y1);
+      ctx.fillStyle = 'rgba(251,191,36,0.05)';
+      ctx.fillRect(d.x1, d.y1, d.x2-d.x1, d.y2-d.y1);
+    }
+  });
+  ctx.restore();
+}
 
 function initCrosshair() {
   const wrap = document.getElementById("chartWrap");
