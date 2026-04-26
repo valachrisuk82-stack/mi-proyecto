@@ -1105,7 +1105,8 @@ async function runAI(){
   const pair=S.pair;let result;
   if(S.serverOk){
     try{
-      const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST",signal:AbortSignal.timeout(8000)});
+      const controller=new AbortController();const tid=setTimeout(()=>controller.abort(),8000);
+      const r=await fetch(`${API_BASE}/analyze/${pair}`,{method:"POST",signal:controller.signal});clearTimeout(tid);
       const d=await r.json();
       if(d.ok)result=d.result;else throw new Error(d.error);
     }
@@ -1242,9 +1243,10 @@ function showAlert(pair,signal){
 
 async function showPrediction(btn) {
   const pair = S.pair || "BTCUSDT";
+  const symbol = S.extPair || pair;
   if(btn) btn.textContent = "⏳ Calculando...";
   try {
-    const r = await fetch(API_BASE + "/predict/" + pair);
+    const r = await fetch(API_BASE + "/predict/" + symbol);
     const d = await r.json();
     if(d.error) { if(btn) btn.textContent="🔮 PREDECIR PRECIO"; return; }
     const dirColor = d.direction==="ALCISTA"?"#10b981":d.direction==="BAJISTA"?"#f43f5e":"#f59e0b";

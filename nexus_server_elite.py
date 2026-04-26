@@ -1228,8 +1228,23 @@ def predict_price(symbol):
         ind = cache["indicators"].get(symbol, {})
         ticker = cache["tickers"].get(symbol, {})
         price = float(ticker.get("lastPrice", 0))
+        # Buscar en activos externos si no hay precio crypto
         if not price:
-            return jsonify({"error": "no price"})
+            ext_prices = cache.get("ext_prices", {})
+            # Buscar por símbolo directo
+            if symbol in ext_prices:
+                price = float(ext_prices[symbol].get("price", 0))
+            # Buscar en ALL_EXTERNAL por nombre
+            if not price:
+                for key, val in ALL_EXTERNAL.items():
+                    if key == symbol or val.get("ticker","").replace("=X","").replace("-USD","") == symbol:
+                        if key in ext_prices:
+                            price = float(ext_prices[key].get("price", 0))
+                            if price:
+                                ind = cache["indicators"].get(key, ind)
+                                break
+        if not price:
+            return jsonify({"error": "no price for " + symbol})
         
         rsi = ind.get("rsi", 50)
         macd = ind.get("macd", {})
