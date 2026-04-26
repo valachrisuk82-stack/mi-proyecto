@@ -1100,6 +1100,7 @@ async function runAI(){
   // Reset por si estaba congelado
   const btn=document.getElementById("analyzeBtn");
   if(btn && btn.disabled) { btn.disabled=false; btn.textContent="▶ ANALIZAR CON IA"; }
+  const btn=document.getElementById("analyzeBtn");
   btn.disabled=true;btn.textContent="⏳ ANALIZANDO...";
   document.getElementById("aiSpin").style.display="inline-block";
   const pair=S.pair;let result;

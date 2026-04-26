@@ -1032,7 +1032,12 @@ def calc_stats(trades, capital, curve):
 
 @app.route("/app")
 def serve_app():
-    return send_file("nexus_apex-FINAL.html")
+    import time
+    with open("nexus_apex.html", "r") as f:
+        html = f.read()
+    html = html.replace("</head>", f'<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta name="version" content="{int(time.time())}"></head>', 1)
+    from flask import Response
+    return Response(html, mimetype="text/html", headers={"Cache-Control":"no-cache, no-store, must-revalidate","Pragma":"no-cache","Expires":"0"})
 
 @app.route("/login")
 def serve_login():
