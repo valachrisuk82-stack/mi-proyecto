@@ -730,7 +730,7 @@ def analyze_local(pair):
     trend  = "ALCISTA" if ind.get("ema9",0)>ind.get("ema21",0) else "BAJISTA"
     return {
         "signal": sig, "confidence": conf, "entry": price,
-        "sl": sl, "tp": tp, "trailing_sl": trail, "rr": 2.0, "lot": lot,
+        "sl": sl, "tp": tp, "trailing_sl": trail, "rr": 3.0, "lot": lot,
         "trend": trend, "strength": "MODERADO",
         "reasoning": (
             f"{'🟢 SEÑAL ALCISTA' if sig=='BUY' else '🔴 SEÑAL BAJISTA' if sig=='SELL' else '⏳ MERCADO LATERAL'}. "
@@ -1010,7 +1010,7 @@ def run_backtest(df, capital, risk_pct):
             if pnl>0: wins+=1
             else: losses+=1
         equity+=pnl; curve.append(round(equity,2))
-        trades.append({"num":len(trades)+1,"signal":sig,"entry":round(entry,4),"sl":round(sl_p,4),"tp":round(tp_p,4),"rr":"2.0","pnl":round(pnl,2),"win":pnl>0,"ml":ml["ml_score"]})
+        trades.append({"num":len(trades)+1,"signal":sig,"entry":round(entry,4),"sl":round(sl_p,4),"tp":round(tp_p,4),"rr":"3.0","pnl":round(pnl,2),"win":pnl>0,"ml":ml["ml_score"]})
         if len(trades)>=80: break
     return trades, curve
 
