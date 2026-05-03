@@ -346,6 +346,11 @@ canvas{position:absolute;top:0;left:0}
     <!-- CHART -->
     <div class="chart-wrap" id="chartWrap">
       <canvas id="candleCanvas"></canvas>
+  <div style="position:absolute;top:36px;right:78px;display:flex;gap:4px;z-index:10">
+    <button onclick="SMC.enabled.ob=!SMC.enabled.ob;this.style.opacity=SMC.enabled.ob?1:0.35;drawCandles(S.candles)" style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.6);color:#10b981;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">OB</button>
+    <button onclick="SMC.enabled.fvg=!SMC.enabled.fvg;this.style.opacity=SMC.enabled.fvg?1:0.35;drawCandles(S.candles)" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.6);color:#fbbf24;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">FVG</button>
+    <button onclick="SMC.enabled.bos=!SMC.enabled.bos;this.style.opacity=SMC.enabled.bos?1:0.35;drawCandles(S.candles)" style="background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.6);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">BOS</button>
+  </div>
       <canvas id="overlayCanvas" style="pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
 
@@ -983,6 +988,9 @@ function drawCandles(candles) {
   document.getElementById("mlFill").style.width=ml+"%";
   document.getElementById("mlFill").style.background=mlColor;
 
+  detectSMC(candles);
+  const smcCtx=cv.getContext("2d");
+  drawSMC(candles,smcCtx,W,H,pad,lo,hi,cH,toY);
   drawLevels(ov,W,H,pad,lo,hi,cH,toY);
 }
 
@@ -1000,6 +1008,161 @@ function drawLevels(ov,W,H,pad,lo,hi,cH,toY){
   drawLine(S.trailP,"rgba(6,182,212,0.9)","TSL");
   drawLine(S.tpP,"rgba(16,185,129,0.9)","TP");
 }
+
+// ══════════════════════════════════════════
+// SMC — Smart Money Concepts Engine
+// ══════════════════════════════════════════
+
+const SMC = {
+  enabled: { ob: true, fvg: true, bos: true },
+  data: { ob: [], fvg: [], bos: [] }
+};
+
+function detectSMC(candles) {
+  if (!candles || candles.length < 10) return;
+  const obs = [], fvgs = [], boss = [];
+  const n = candles.length;
+
+  // ── ORDER BLOCKS ──
+  for (let i = 2; i < n - 1; i++) {
+    const prev = candles[i - 1], cur = candles[i], next = candles[i + 1];
+    const isBullOB = prev.close < prev.open &&
+                     cur.close > cur.open &&
+                     next.close > next.open &&
+                     next.close > prev.high;
+    const isBearOB = prev.close > prev.open &&
+                     cur.close < cur.open &&
+                     next.close < next.open &&
+                     next.close < prev.low;
+    if (isBullOB) obs.push({ type: 'bull', high: prev.high, low: prev.low, idx: i - 1 });
+    if (isBearOB) obs.push({ type: 'bear', high: prev.high, low: prev.low, idx: i - 1 });
+  }
+
+  // ── FAIR VALUE GAPS ──
+  for (let i = 1; i < n - 1; i++) {
+    const a = candles[i - 1], b = candles[i], c = candles[i + 1];
+    const bullFVG = c.low > a.high;
+    const bearFVG = c.high < a.low;
+    if (bullFVG) fvgs.push({ type: 'bull', top: c.low, bot: a.high, idx: i });
+    if (bearFVG) fvgs.push({ type: 'bear', top: a.low, bot: c.high, idx: i });
+  }
+
+  // ── BOS / ChoCH ──
+  const swing = 5;
+  for (let i = swing; i < n - swing; i++) {
+    const hi = candles[i].high;
+    const lo = candles[i].low;
+    const isSwingHigh = [...Array(swing)].every((_, k) =>
+      candles[i - k - 1].high < hi && candles[i + k + 1].high < hi);
+    const isSwingLow = [...Array(swing)].every((_, k) =>
+      candles[i - k - 1].low > lo && candles[i + k + 1].low > lo);
+
+    if (isSwingHigh) {
+      for (let j = i + 1; j < n; j++) {
+        if (candles[j].close > hi) {
+          const prevTrend = i > swing ? 'up' : 'down';
+          boss.push({ type: prevTrend === 'down' ? 'ChoCH' : 'BOS', price: hi, idx: i, breakIdx: j, dir: 'bull' });
+          break;
+        }
+      }
+    }
+    if (isSwingLow) {
+      for (let j = i + 1; j < n; j++) {
+        if (candles[j].close < lo) {
+          boss.push({ type: 'BOS', price: lo, idx: i, breakIdx: j, dir: 'bear' });
+          break;
+        }
+      }
+    }
+  }
+
+  SMC.data.ob  = obs.slice(-6);
+  SMC.data.fvg = fvgs.slice(-6);
+  SMC.data.bos = boss.slice(-4);
+}
+
+function drawSMC(candles, ctx, W, H, pad, lo, hi, cH, toY) {
+  if (!candles || !candles.length) return;
+  const n = candles.length;
+  const cW = W - pad.left - pad.right;
+  const gap = cW / n;
+
+  const toX = idx => pad.left + idx * gap + gap / 2;
+
+  ctx.save();
+
+  // ── ORDER BLOCKS ──
+  if (SMC.enabled.ob) {
+    SMC.data.ob.forEach(ob => {
+      if (ob.high < lo || ob.low > hi) return;
+      const x1 = toX(ob.idx);
+      const x2 = Math.min(toX(Math.min(ob.idx + 30, n - 1)), W - pad.right);
+      const y1 = toY(ob.high);
+      const y2 = toY(ob.low);
+      const color = ob.type === 'bull' ? 'rgba(16,185,129,' : 'rgba(244,63,94,';
+      ctx.fillStyle = color + '0.08)';
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeStyle = color + '0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.setLineDash([]);
+      ctx.fillStyle = color + '0.9)';
+      ctx.font = 'bold 8px JetBrains Mono, monospace';
+      ctx.fillText('OB ' + (ob.type === 'bull' ? '▲' : '▼'), x1 + 3, ob.type === 'bull' ? y2 - 3 : y1 + 9);
+    });
+  }
+
+  // ── FAIR VALUE GAPS ──
+  if (SMC.enabled.fvg) {
+    SMC.data.fvg.forEach(fvg => {
+      if (fvg.top < lo || fvg.bot > hi) return;
+      const x1 = toX(fvg.idx);
+      const x2 = Math.min(toX(Math.min(fvg.idx + 20, n - 1)), W - pad.right);
+      const y1 = toY(fvg.top);
+      const y2 = toY(fvg.bot);
+      const color = fvg.type === 'bull' ? 'rgba(251,191,36,' : 'rgba(168,85,247,';
+      ctx.fillStyle = color + '0.07)';
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeStyle = color + '0.5)';
+      ctx.lineWidth = 0.8;
+      ctx.setLineDash([2, 4]);
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.setLineDash([]);
+      ctx.fillStyle = color + '0.9)';
+      ctx.font = 'bold 7px JetBrains Mono, monospace';
+      ctx.fillText('FVG', x1 + 3, y1 + 8);
+    });
+  }
+
+  // ── BOS / ChoCH ──
+  if (SMC.enabled.bos) {
+    SMC.data.bos.forEach(b => {
+      if (b.price < lo || b.price > hi) return;
+      const x1 = toX(b.idx);
+      const x2 = toX(Math.min(b.breakIdx, n - 1));
+      const y  = toY(b.price);
+      const isBOS = b.type === 'BOS';
+      const color = b.dir === 'bull' ? 'rgba(16,185,129,0.9)' : 'rgba(244,63,94,0.9)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash(isBOS ? [] : [4, 3]);
+      ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+      ctx.setLineDash([]);
+      const label = b.type + (b.dir === 'bull' ? ' ▲' : ' ▼');
+      const lw = ctx.measureText(label).width + 6;
+      const lx = x1 + (x2 - x1) / 2 - lw / 2;
+      ctx.fillStyle = color.replace('0.9)', '0.15)');
+      ctx.fillRect(lx, y - 9, lw, 12);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 7px JetBrains Mono, monospace';
+      ctx.fillText(label, lx + 3, y + 1);
+    });
+  }
+
+  ctx.restore();
+}
+
 
 // ── INDICATORS ──
 async function fetchIndicators(pair) {
