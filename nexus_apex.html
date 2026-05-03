@@ -1270,6 +1270,32 @@ async function showPrediction(btn) {
   if(btn) btn.textContent = "🔮 PREDECIR PRECIO";
 }
 
+
+// ── ORDER BOOK & LIQUIDEZ ──
+let S_orderbook = null;
+
+async function fetchOrderbook() {
+  const pair = S.pair || "BTCUSDT";
+  if(!pair.endsWith("USDT")) return;
+  try {
+    const r = await fetch(API_BASE + "/orderbook/" + pair);
+    const d = await r.json();
+    if(d.error) return;
+    S_orderbook = d;
+    updateOrderbookUI(d);
+  } catch(e) {}
+}
+
+function updateOrderbookUI(d) {
+  const whaleEl = document.getElementById("whaleSignal");
+  if(whaleEl) {
+    whaleEl.textContent = "WHALE: " + d.whale_signal;
+    whaleEl.style.color = d.whale_signal==="BUY"?"var(--up)":d.whale_signal==="SELL"?"var(--dn)":"var(--text3)";
+  }
+}
+
+setInterval(fetchOrderbook, 10000);
+
 function toggleAiPanel(){
   const panel = document.getElementById('aiPanel');
   panel.classList.toggle('collapsed');

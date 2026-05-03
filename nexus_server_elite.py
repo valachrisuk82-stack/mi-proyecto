@@ -118,6 +118,8 @@ def get_orderbook_deep(symbol, limit=100):
 
         bid_vol = sum(v for _, v in bids)
         ask_vol = sum(v for _, v in asks)
+        top_bids = sorted(bids, key=lambda x: x[1], reverse=True)[:5]
+        top_asks = sorted(asks, key=lambda x: x[1], reverse=True)[:5]
         total   = bid_vol + ask_vol or 1
 
         # Detect large orders (whales)
@@ -137,6 +139,10 @@ def get_orderbook_deep(symbol, limit=100):
             "whale_asks": round(whale_asks, 2),
             "pressure":   "COMPRADORES" if bid_vol > ask_vol else "VENDEDORES",
             "whale_signal": "BUY" if whale_bids > whale_asks * 1.5 else "SELL" if whale_asks > whale_bids * 1.5 else "NEUTRAL",
+            "top_bids": top_bids,
+            "top_asks": top_asks,
+            "bid_vol": round(bid_vol,2),
+            "ask_vol": round(ask_vol,2),
         }
     except:
         return {"bid_pct":50,"ask_pct":50,"imbalance":0,"whale_bids":0,"whale_asks":0,"pressure":"NEUTRAL","whale_signal":"NEUTRAL"}
@@ -1207,6 +1213,24 @@ def ext_tickers():
         except:
             result[sym] = {"price":0,"change":0,"category":info["cat"],"signal":"WAIT","confidence":50,"ml_score":50}
     return jsonify(result)
+
+
+@app.route("/api/orderbook/<symbol>")
+def orderbook(symbol):
+    try:
+        data = get_orderbook_deep(symbol)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/api/volume_profile/<symbol>")
+def volume_profile(symbol):
+    try:
+        df = get_klines(symbol, "1h", 200)
+        vp = calc_volume_profile(df)
+        return jsonify(vp)
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/api/alert_price", methods=["POST"])
 def alert_price():
