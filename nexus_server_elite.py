@@ -198,6 +198,91 @@ def get_news_sentiment(symbol):
 # ══════════════════════════════════════════════════════════════════
 #  INDICADORES TÉCNICOS
 # ══════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════
+#  SMART MONEY CONCEPTS
+# ══════════════════════════════════════════════════════════════════
+def detect_smc(df):
+    """Detecta Order Blocks, FVG, BOS/ChoCH"""
+    try:
+        closes = df["close"].values
+        highs = df["high"].values
+        lows = df["low"].values
+        opens = df["open"].values
+        n = len(df)
+        
+        order_blocks = []
+        fvg = []
+        bos = []
+        
+        # Order Blocks — última vela bajista antes de movimiento alcista fuerte
+        for i in range(2, min(n-1, 50)):
+            idx = n - 1 - i  # Desde el final
+            
+            # Bullish Order Block: vela bajista seguida de movimiento alcista
+            if opens[idx] > closes[idx]:  # Vela bajista
+                # Verificar que siguiente movimiento sea alcista fuerte
+                future_high = max(highs[idx+1:min(idx+5, n)])
+                if future_high > highs[idx] * 1.002:
+                    order_blocks.append({
+                        "type": "bull",
+                        "high": round(float(highs[idx]), 4),
+                        "low": round(float(lows[idx]), 4),
+                        "index": int(idx)
+                    })
+            
+            # Bearish Order Block: vela alcista seguida de movimiento bajista
+            elif closes[idx] > opens[idx]:  # Vela alcista
+                future_low = min(lows[idx+1:min(idx+5, n)])
+                if future_low < lows[idx] * 0.998:
+                    order_blocks.append({
+                        "type": "bear",
+                        "high": round(float(highs[idx]), 4),
+                        "low": round(float(lows[idx]), 4),
+                        "index": int(idx)
+                    })
+        
+        # Fair Value Gaps (FVG) — gaps entre velas
+        for i in range(1, min(n-1, 30)):
+            idx = n - 1 - i
+            # Bullish FVG: low[i+1] > high[i-1]
+            if lows[idx+1] > highs[idx-1]:
+                fvg.append({
+                    "type": "bull",
+                    "high": round(float(lows[idx+1]), 4),
+                    "low": round(float(highs[idx-1]), 4),
+                    "index": int(idx)
+                })
+            # Bearish FVG: high[i+1] < low[i-1]
+            elif highs[idx+1] < lows[idx-1]:
+                fvg.append({
+                    "type": "bear",
+                    "high": round(float(lows[idx-1]), 4),
+                    "low": round(float(highs[idx+1]), 4),
+                    "index": int(idx)
+                })
+        
+        # BOS/ChoCH — Break of Structure
+        recent_high = max(highs[-20:])
+        recent_low = min(lows[-20:])
+        current = closes[-1]
+        
+        if current > recent_high * 0.999:
+            bos.append({"type": "BOS_BULL", "level": round(float(recent_high), 4)})
+        elif current < recent_low * 1.001:
+            bos.append({"type": "BOS_BEAR", "level": round(float(recent_low), 4)})
+        
+        return {
+            "order_blocks": order_blocks[:5],
+            "fvg": fvg[:5],
+            "bos": bos,
+            "premium_zone": round(float(recent_high), 4),
+            "discount_zone": round(float(recent_low), 4),
+            "equilibrium": round(float((recent_high + recent_low) / 2), 4)
+        }
+    except Exception as e:
+        return {"order_blocks": [], "fvg": [], "bos": [], "error": str(e)}
+
 def calc_rsi(df, period=14):
     delta = df["close"].diff()
     gain  = delta.where(delta > 0, 0).rolling(period).mean()
@@ -1215,6 +1300,16 @@ def ext_tickers():
     return jsonify(result)
 
 
+
+@app.route("/api/smc/<symbol>")
+def smc_analysis(symbol):
+    try:
+        df = get_klines(symbol, "1h", 100)
+        smc = detect_smc(df)
+        return jsonify(smc)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/api/orderbook/<symbol>")
 def orderbook(symbol):
     try:
@@ -1317,6 +1412,57 @@ def predict_price(symbol):
         })
     except Exception as e:
         return jsonify({"error": str(e)})
+
+
+@app.route("/api/smc_signal", methods=["POST"])
+def smc_signal():
+    try:
+        data = request.get_json()
+        pair     = data.get("pair", "BTCUSDT")
+        signal   = data.get("signal")        # "LONG" o "SHORT"
+        entry    = float(data.get("entry", 0))
+        sl       = float(data.get("sl", 0))
+        tp       = float(data.get("tp", 0))
+        ob_type  = data.get("ob_type", "")
+        fvg      = data.get("fvg", False)
+        bos      = data.get("bos", "")
+        conf     = int(data.get("confidence", 0))
+
+        if not signal or entry == 0:
+            return jsonify({"ok": False, "error": "Datos incompletos"})
+
+        rr = round(abs(tp - entry) / abs(entry - sl), 2) if abs(entry - sl) > 0 else 0
+        emoji = "🟢" if signal == "LONG" else "🔴"
+        bars = "█" * (conf // 10) + "░" * (10 - conf // 10)
+
+        msg = (
+            f"{emoji} <b>SMC SIGNAL — {signal} {pair}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📦 Order Block: <b>{ob_type}</b>\n"
+            f"📊 FVG: {'✅' if fvg else '❌'}  |  BOS: <b>{bos}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 Entrada:  <b>${entry:,.4f}</b>\n"
+            f"🛑 Stop Loss: <b>${sl:,.4f}</b>\n"
+            f"🎯 Take Profit: <b>${tp:,.4f}</b>\n"
+            f"📐 R:R  <b>1:{rr}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🧠 Confluencia SMC: {bars} {conf}%\n"
+            f"⚡ NEXUS APEX — Smart Money"
+        )
+
+        send_telegram(msg)
+        cache["history"].insert(0, {
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "pair": pair,
+            "signal": signal,
+            "confidence": conf,
+            "price": entry,
+            "ml_score": conf,
+            "source": "SMC"
+        })
+        return jsonify({"ok": True, "rr": rr})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 @app.route("/api/categories")
 def categories():

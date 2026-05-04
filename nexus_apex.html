@@ -989,6 +989,7 @@ function drawCandles(candles) {
   document.getElementById("mlFill").style.background=mlColor;
 
   detectSMC(candles);
+  checkSMCSignal(candles);
   const smcCtx=cv.getContext("2d");
   drawSMC(candles,smcCtx,W,H,pad,lo,hi,cH,toY);
   drawLevels(ov,W,H,pad,lo,hi,cH,toY);
@@ -1080,6 +1081,92 @@ function detectSMC(candles) {
   SMC.data.fvg = fvgs.slice(-6);
   SMC.data.bos = boss.slice(-4);
 }
+
+// ── SMC AUTO-SIGNAL ──
+function checkSMCSignal(candles) {
+  if (!candles || candles.length < 10) return;
+  const last = candles[candles.length - 1];
+  const price = last.close;
+  const atr = S.inds[S.pair]?.atr || price * 0.002;
+
+  let signal = null, ob_type = '', fvg = false, bos = '', entry = 0, sl = 0, tp = 0, conf = 0;
+
+  // Buscar confluencia LONG: precio toca bullish OB + FVG bull + BOS bull
+  const bullOB = SMC.data.ob.find(o => o.type === 'bull' && price >= o.low && price <= o.high * 1.002);
+  const bullFVG = SMC.data.fvg.find(f => f.type === 'bull' && price >= f.bot && price <= f.top * 1.005);
+  const bullBOS = SMC.data.bos.find(b => b.dir === 'bull');
+
+  if (bullOB) { conf += 40; ob_type = 'Bullish OB'; }
+  if (bullFVG) { conf += 30; fvg = true; }
+  if (bullBOS) { conf += 30; bos = bullBOS.type; }
+
+  if (conf >= 70 && bullOB) {
+    signal = 'LONG';
+    entry  = price;
+    sl     = bullOB.low - atr * 0.5;
+    tp     = price + (price - sl) * 3;
+  }
+
+  // Buscar confluencia SHORT: precio toca bearish OB + FVG bear + BOS bear
+  if (!signal) {
+    conf = 0;
+    const bearOB  = SMC.data.ob.find(o => o.type === 'bear' && price <= o.high && price >= o.low * 0.998);
+    const bearFVG = SMC.data.fvg.find(f => f.type === 'bear' && price <= f.top && price >= f.bot * 0.995);
+    const bearBOS = SMC.data.bos.find(b => b.dir === 'bear');
+
+    if (bearOB)  { conf += 40; ob_type = 'Bearish OB'; }
+    if (bearFVG) { conf += 30; fvg = true; }
+    if (bearBOS) { conf += 30; bos = bearBOS?.type || 'BOS'; }
+
+    if (conf >= 70 && bearOB) {
+      signal = 'SHORT';
+      entry  = price;
+      sl     = bearOB.high + atr * 0.5;
+      tp     = price - (sl - price) * 3;
+    }
+  }
+
+  if (!signal) return;
+
+  // Anti-spam: no repetir señal del mismo tipo en 5 min
+  const key = S.pair + signal;
+  const now = Date.now();
+  if (SMC._lastSignal && SMC._lastSignal[key] && now - SMC._lastSignal[key] < 300000) return;
+  if (!SMC._lastSignal) SMC._lastSignal = {};
+  SMC._lastSignal[key] = now;
+
+  // Mostrar en UI
+  console.log(`🎯 SMC Signal: ${signal} ${S.pair} — Conf: ${conf}%`);
+  
+  // Enviar al backend → Telegram
+  fetch(`${API_BASE}/smc_signal`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ pair: S.pair, signal, entry, sl, tp, ob_type, fvg, bos, confidence: conf })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) showSMCToast(signal, entry, sl, tp, conf, d.rr);
+  }).catch(() => {});
+}
+
+function showSMCToast(signal, entry, sl, tp, conf, rr) {
+  const existing = document.getElementById('smcToast');
+  if (existing) existing.remove();
+  const color = signal === 'LONG' ? '#10b981' : '#ef4444';
+  const div = document.createElement('div');
+  div.id = 'smcToast';
+  div.style.cssText = `position:fixed;bottom:24px;right:24px;background:#0f172a;border:1px solid ${color};border-radius:8px;padding:12px 16px;z-index:9999;font-family:JetBrains Mono,monospace;font-size:11px;color:#e2e8f0;min-width:200px;box-shadow:0 0 20px ${color}44`;
+  div.innerHTML = `
+    <div style="color:${color};font-weight:bold;font-size:13px;margin-bottom:6px">⚡ SMC ${signal} — ${conf}% conf</div>
+    <div>Entry: <b>$${entry.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
+    <div>SL: <span style="color:#ef4444">$${sl.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>
+    <div>TP: <span style="color:#10b981">$${tp.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>
+    <div style="margin-top:4px;color:#94a3b8">R:R 1:${rr} · Telegram ✅</div>
+    <div onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:10px;cursor:pointer;color:#64748b">✕</div>
+  `;
+  document.body.appendChild(div);
+  setTimeout(() => div?.remove(), 30000);
+}
+
 
 function drawSMC(candles, ctx, W, H, pad, lo, hi, cH, toY) {
   if (!candles || !candles.length) return;
