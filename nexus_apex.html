@@ -233,7 +233,7 @@ canvas{position:absolute;top:0;left:0}
 .ai-panel-title{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)}
 .ai-panel-arrow{font-size:12px;color:var(--neon-up);transition:transform .3s}
 .ai-panel.collapsed .ai-panel-arrow{transform:rotate(180deg)}
-.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
+.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
 .ai-col{padding:10px 14px;border-right:1px solid var(--border);overflow-y:auto}
 .ai-col:last-child{border-right:none}
 .ai-col-title{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px;font-family:'Syne',sans-serif}
@@ -443,6 +443,17 @@ canvas{position:absolute;top:0;left:0}
       </div>
     </div>
 
+    <!-- COL 5: SMC SCANNER -->
+    <div class="ai-col" style="border-left:1px solid rgba(168,85,247,0.2)">
+      <div class="ai-col-title" style="color:#a855f7">SMC SCANNER</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <button onclick="runSMCScan()" style="flex:1;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.5);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:4px;border-radius:3px;cursor:pointer">⚡ SCAN</button>
+        <div id="smcScanStatus" style="font:7px JetBrains Mono,monospace;color:#64748b;display:flex;align-items:center;padding:0 4px">--:--</div>
+      </div>
+      <div id="smcScanList" style="overflow-y:auto;max-height:185px;display:flex;flex-direction:column;gap:3px">
+        <div style="color:#475569;font:8px JetBrains Mono,monospace;text-align:center;padding:20px 0">Sin señales aún.<br>Presiona SCAN</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1081,6 +1092,47 @@ function detectSMC(candles) {
   SMC.data.fvg = fvgs.slice(-6);
   SMC.data.bos = boss.slice(-4);
 }
+
+
+// ── SMC SCANNER PANEL ──
+async function runSMCScan() {
+  const btn = document.querySelector('[onclick="runSMCScan()"]');
+  if (btn) btn.textContent = '⏳ Scanning...';
+  try {
+    const r = await fetch(`${API_BASE}/smc_scan`);
+    const d = await r.json();
+    renderSMCScanPanel(d.history || [], d.last_scan || {});
+    document.getElementById('smcScanStatus').textContent = d.last_scan?.time || '--:--';
+  } catch(e) {
+    document.getElementById('smcScanList').innerHTML = '<div style="color:#ef4444;font:8px JetBrains Mono,monospace;text-align:center;padding:10px">Error conectando</div>';
+  }
+  if (btn) btn.textContent = '⚡ SCAN';
+}
+
+function renderSMCScanPanel(history, lastScan) {
+  const list = document.getElementById('smcScanList');
+  if (!history.length) {
+    list.innerHTML = '<div style="color:#475569;font:8px JetBrains Mono,monospace;text-align:center;padding:20px 0">Sin señales aún.<br>El scanner corre cada 5 min.</div>';
+    return;
+  }
+  list.innerHTML = history.map(s => {
+    const isLong = s.signal === 'LONG';
+    const color  = isLong ? '#10b981' : '#ef4444';
+    const bg     = isLong ? 'rgba(16,185,129,0.08)' : 'rgba(244,63,94,0.08)';
+    const bars   = '█'.repeat(Math.floor(s.confidence/10)) + '░'.repeat(10-Math.floor(s.confidence/10));
+    return `<div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:4px 6px;cursor:pointer" onclick="selectPair('${s.pair}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:${color};font:bold 9px JetBrains Mono,monospace">${s.signal} ${s.pair.replace('USDT','')}</span>
+        <span style="color:#64748b;font:7px JetBrains Mono,monospace">${s.time||''}</span>
+      </div>
+      <div style="color:#94a3b8;font:7px JetBrains Mono,monospace;margin-top:2px">$${s.price?.toLocaleString()} · ${s.confidence}%</div>
+      <div style="color:${color};font:7px JetBrains Mono,monospace">${bars}</div>
+    </div>`;
+  }).join('');
+}
+
+setTimeout(() => runSMCScan(), 3000);
+setInterval(() => runSMCScan(), 300000);
 
 // ── SMC AUTO-SIGNAL ──
 function checkSMCSignal(candles) {

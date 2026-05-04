@@ -695,7 +695,7 @@ cache = {
     "history":    [],
     "last_update":None,
     "updating":   False,
-    "last_alerts":{},"sr_alerts":{},
+    "last_alerts":{},"sr_alerts":{},"smc_history":[],"smc_last_scan":{},
 }
 
 def update_all():
@@ -768,6 +768,18 @@ def update_all():
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")
+
+
+def smc_scanner():
+    """Thread que escanea SMC cada 5 minutos"""
+    import time as _time
+    _time.sleep(30)  # esperar que arranque el servidor
+    while True:
+        try:
+            scan_smc_all_pairs()
+        except Exception as e:
+            pass
+        _time.sleep(300)  # cada 5 minutos
 
 def news_updater():
     """Actualiza noticias cada 5 minutos"""
@@ -1464,6 +1476,129 @@ def smc_signal():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
+
+@app.route("/api/smc_scan")
+def smc_scan():
+    """Escanea todos los pares y retorna los mejores setups SMC"""
+    return jsonify({
+        "history": cache.get("smc_history", []),
+        "last_scan": cache.get("smc_last_scan", {})
+    })
+
+def detect_ob_fvg_bos(klines):
+    """Detecta SMC en lista de klines [{open,high,low,close,volume}]"""
+    if len(klines) < 20: return [], [], set()
+    o = [k['open']   for k in klines]
+    h = [k['high']   for k in klines]
+    l = [k['low']    for k in klines]
+    c = [k['close']  for k in klines]
+    n = len(klines)
+    atr = sum(h[i]-l[i] for i in range(n-14,n)) / 14
+
+    obs, fvgs, bos_dirs = [], [], set()
+
+    for j in range(1, n-1):
+        if c[j-1]<o[j-1] and c[j]>o[j] and c[j+1]>h[j-1]:
+            obs.append({'type':'bull','high':h[j-1],'low':l[j-1]})
+        if c[j-1]>o[j-1] and c[j]<o[j] and c[j+1]<l[j-1]:
+            obs.append({'type':'bear','high':h[j-1],'low':l[j-1]})
+
+    for j in range(1, n-1):
+        if l[j+1]>h[j-1] and (l[j+1]-h[j-1])>atr*0.25:
+            fvgs.append({'type':'bull','top':l[j+1],'bot':h[j-1]})
+        if h[j+1]<l[j-1] and (l[j-1]-h[j+1])>atr*0.25:
+            fvgs.append({'type':'bear','top':l[j-1],'bot':h[j+1]})
+
+    swing_h = max(h[-20:-1])
+    swing_l = min(l[-20:-1])
+    if c[-1] > swing_h: bos_dirs.add('bull')
+    if c[-1] < swing_l: bos_dirs.add('bear')
+
+    return obs[-8:], fvgs[-8:], bos_dirs
+
+def scan_smc_all_pairs():
+    """Escanea todos los pares cada 5 min buscando confluencia SMC"""
+    import requests as req
+    results = []
+    for pair in PAIRS:
+        try:
+            # Obtener klines 1H
+            r = req.get(f"https://api.binance.com/api/v3/klines",
+                       params={"symbol":pair,"interval":"1h","limit":60}, timeout=5)
+            raw = r.json()
+            klines = [{"open":float(k[1]),"high":float(k[2]),"low":float(k[3]),
+                       "close":float(k[4]),"volume":float(k[5])} for k in raw]
+            if len(klines) < 30: continue
+
+            obs, fvgs, bos_dirs = detect_ob_fvg_bos(klines)
+            price = klines[-1]['close']
+            atr   = sum(k['high']-k['low'] for k in klines[-14:]) / 14
+
+            # Calcular EMAs simples
+            closes = [k['close'] for k in klines]
+            ema9  = closes[-1]
+            ema21 = closes[-1]
+            for i in range(len(closes)-1, max(0,len(closes)-50), -1):
+                ema9  = closes[i]*0.2   + ema9*0.8
+                ema21 = closes[i]*0.095 + ema21*0.905
+
+            conf = 0
+            direction = None
+
+            # LONG setup
+            if ema9 > ema21:
+                bull_ob  = next((o for o in obs  if o['type']=='bull' and o['low']<=price<=o['high']*1.004), None)
+                bull_fvg = next((f for f in fvgs if f['type']=='bull' and f['bot']<=price<=f['top']*1.005), None)
+                if bull_ob:  conf += 40
+                if bull_fvg: conf += 30
+                if 'bull' in bos_dirs: conf += 30
+                if conf >= 70: direction = 'LONG'
+
+            # SHORT setup
+            if not direction and ema9 < ema21:
+                conf = 0
+                bear_ob  = next((o for o in obs  if o['type']=='bear' and o['low']*0.996<=price<=o['high']), None)
+                bear_fvg = next((f for f in fvgs if f['type']=='bear' and f['bot']*0.995<=price<=f['top']), None)
+                if bear_ob:  conf += 40
+                if bear_fvg: conf += 30
+                if 'bear' in bos_dirs: conf += 30
+                if conf >= 70: direction = 'SHORT'
+
+            if direction:
+                results.append({
+                    "pair": pair,
+                    "signal": direction,
+                    "confidence": conf,
+                    "price": round(price, 4),
+                    "atr": round(atr, 4),
+                    "time": datetime.now().strftime("%H:%M:%S")
+                })
+        except Exception as e:
+            pass
+
+    # Ordenar por confianza
+    results.sort(key=lambda x: x['confidence'], reverse=True)
+    cache['smc_last_scan'] = {"time": datetime.now().strftime("%H:%M:%S"), "pairs_scanned": len(PAIRS), "setups": len(results)}
+
+    # Guardar en historial y alertar el mejor
+    for r in results[:3]:
+        key = r['pair'] + r['signal']
+        last = cache.get('smc_scan_alerts', {}).get(key)
+        now_ts = datetime.now().timestamp()
+        if not last or now_ts - last > 300:
+            if not hasattr(cache, 'smc_scan_alerts'): cache['smc_scan_alerts'] = {}
+            cache.setdefault('smc_scan_alerts', {})[key] = now_ts
+            cache['smc_history'].insert(0, r)
+            if len(cache['smc_history']) > 50: cache['smc_history'] = cache['smc_history'][:50]
+            emoji = "🟢" if r['signal']=='LONG' else "🔴"
+            bars = "█"*(r['confidence']//10) + "░"*(10-r['confidence']//10)
+            msg = (f"{emoji} <b>SMC SCAN — {r['signal']} {r['pair']}</b>\n"
+                   f"💰 Precio: <b>${r['price']:,.4f}</b>\n"
+                   f"🧠 Confluencia: {bars} {r['confidence']}%\n"
+                   f"⚡ NEXUS APEX Multi-Scanner")
+            send_telegram(msg)
+    return results
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
@@ -1483,6 +1618,7 @@ print("═"*58)
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
+threading.Thread(target=smc_scanner, daemon=True).start()
 print("\n  ✅ Servidor listo en http://localhost:5001")
 print("  → Abre nexus_elite.html en tu navegador\n")
 
