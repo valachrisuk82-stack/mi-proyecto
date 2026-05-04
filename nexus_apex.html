@@ -450,6 +450,20 @@ canvas{position:absolute;top:0;left:0}
         <button onclick="runSMCScan()" style="flex:1;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.5);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:4px;border-radius:3px;cursor:pointer">⚡ SCAN</button>
         <div id="smcScanStatus" style="font:7px JetBrains Mono,monospace;color:#64748b;display:flex;align-items:center;padding:0 4px">--:--</div>
       </div>
+      <div id="smcStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:6px">
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:3px;padding:3px;text-align:center">
+          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">WR%</div>
+          <div id="smcStatWR" style="color:#10b981;font:bold 11px JetBrains Mono,monospace">--%</div>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:3px;padding:3px;text-align:center">
+          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">PF</div>
+          <div id="smcStatPF" style="color:#fbbf24;font:bold 11px JetBrains Mono,monospace">--</div>
+        </div>
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:3px;padding:3px;text-align:center">
+          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">NET R</div>
+          <div id="smcStatR" style="color:#3b82f6;font:bold 11px JetBrains Mono,monospace">--</div>
+        </div>
+      </div>
       <div id="smcScanList" style="overflow-y:auto;max-height:185px;display:flex;flex-direction:column;gap:3px">
         <div style="color:#475569;font:8px JetBrains Mono,monospace;text-align:center;padding:20px 0">Sin señales aún.<br>Presiona SCAN</div>
       </div>
@@ -888,8 +902,11 @@ function drawCandles(candles) {
 
   // Background grid
   // Fondo
-  ctx.fillStyle="#0a0e1a";ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle="rgba(255,255,255,0.04)";ctx.lineWidth=1;
+  const bgGrad = ctx.createLinearGradient(0,0,0,H);
+  bgGrad.addColorStop(0,'#060912');
+  bgGrad.addColorStop(1,'#0a0e1a');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=0.5;
   for(let i=0;i<=6;i++){
     const y=pad.top+(cH/6)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
@@ -931,7 +948,8 @@ function drawCandles(candles) {
     const ema9arr = calcEMA(closes, 9);
     const ema21arr = calcEMA(closes, 21);
     // Dibujar EMA9 (verde)
-    ctx.strokeStyle="rgba(0,255,136,0.7)";ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.shadowColor='rgba(0,255,136,0.8)';ctx.shadowBlur=8;
+    ctx.strokeStyle="rgba(0,255,136,0.9)";ctx.lineWidth=1.5;ctx.setLineDash([]);
     ctx.beginPath();
     ema9arr.forEach((v,i)=>{
       if(v<lo||v>hi)return;
@@ -940,7 +958,8 @@ function drawCandles(candles) {
     });
     ctx.stroke();
     // Dibujar EMA21 (naranja)
-    ctx.strokeStyle="rgba(251,146,60,0.7)";ctx.lineWidth=1.5;
+    ctx.shadowColor='rgba(251,146,60,0.8)';ctx.shadowBlur=8;
+    ctx.strokeStyle="rgba(251,146,60,0.9)";ctx.lineWidth=1.5;
     ctx.beginPath();
     ema21arr.forEach((v,i)=>{
       if(v<lo||v>hi)return;
@@ -951,6 +970,7 @@ function drawCandles(candles) {
     // Labels
     const lastX=W-pad.right-2;
     ctx.font="bold 8px 'JetBrains Mono'";
+    ctx.shadowBlur=0;
     ctx.fillStyle="rgba(0,255,136,0.9)";
     ctx.fillText("EMA9", lastX-28, toY(ema9arr[ema9arr.length-1])-3);
     ctx.fillStyle="rgba(251,146,60,0.9)";
@@ -969,23 +989,36 @@ function drawCandles(candles) {
     const o=toY(c.open),cl=toY(c.close);
     const hi_y=toY(c.high),lo_y=toY(c.low);
     const isBull=c.close>=c.open;
-    const colU="#26a69a",colD="#ef5350";
+    const colU="#26a69a",colD="#ef5350",colUG="#00ffaa",colDG="#ff4466";
     const bodyT=Math.min(o,cl),bodyH=Math.max(1,Math.abs(cl-o));
     // Mecha
+    // Mecha con glow
+    ctx.shadowColor = isBull ? colUG : colDG;
+    ctx.shadowBlur = 2;
     ctx.strokeStyle=isBull?colU:colD;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(cx,hi_y);ctx.lineTo(cx,lo_y);ctx.stroke();
-    // Cuerpo relleno
-    ctx.fillStyle=isBull?colU:colD;
+    ctx.shadowBlur = 0;
+    // Cuerpo con gradiente
+    const grad = ctx.createLinearGradient(x, bodyT, x, bodyT+bodyH);
+    if(isBull){
+      grad.addColorStop(0, '#2dd4a0');
+      grad.addColorStop(1, '#1a7a72');
+    } else {
+      grad.addColorStop(0, '#ef5350');
+      grad.addColorStop(1, '#b03030');
+    }
+    ctx.fillStyle = grad;
     ctx.fillRect(x+1,bodyT,Math.max(1,cw-1),bodyH);
     // Borde nítido
-    ctx.strokeStyle=isBull?"#1a7a72":"#b03030";ctx.lineWidth=0.5;
+    ctx.strokeStyle=isBull?"rgba(0,255,160,0.4)":"rgba(255,60,60,0.4)";ctx.lineWidth=0.5;
     ctx.strokeRect(x+1,bodyT,Math.max(1,cw-1),bodyH);
   });
 
   // Current price line
   const last=candles[candles.length-1].close;
   const pY=toY(last);
-  ctx.strokeStyle="rgba(59,130,246,0.6)";ctx.lineWidth=1;ctx.setLineDash([5,3]);
+  ctx.shadowColor='rgba(59,130,246,0.6)';ctx.shadowBlur=6;
+  ctx.strokeStyle="rgba(59,130,246,0.8)";ctx.lineWidth=1;ctx.setLineDash([5,3]);
   ctx.beginPath();ctx.moveTo(pad.left,pY);ctx.lineTo(W-pad.right,pY);ctx.stroke();ctx.setLineDash([]);
   ctx.fillStyle="#3b82f6";ctx.fillRect(W-pad.right,pY-8,pad.right,16);
   ctx.fillStyle="#fff";ctx.font="bold 8px 'JetBrains Mono'";
@@ -1102,11 +1135,29 @@ async function runSMCScan() {
     const r = await fetch(`${API_BASE}/smc_scan`);
     const d = await r.json();
     renderSMCScanPanel(d.history || [], d.last_scan || {});
+    updateSMCStats(d.history || []);
     document.getElementById('smcScanStatus').textContent = d.last_scan?.time || '--:--';
   } catch(e) {
     document.getElementById('smcScanList').innerHTML = '<div style="color:#ef4444;font:8px JetBrains Mono,monospace;text-align:center;padding:10px">Error conectando</div>';
   }
   if (btn) btn.textContent = '⚡ SCAN';
+}
+
+function updateSMCStats(history) {
+  if (!history || !history.length) return;
+  const wins   = history.filter(s => s.outcome === 'WIN').length;
+  const losses = history.filter(s => s.outcome === 'LOSS').length;
+  const total  = wins + losses;
+  if (!total) return;
+  const wr  = (wins/total*100).toFixed(1);
+  const pf  = losses > 0 ? (wins*3/losses).toFixed(2) : '∞';
+  const netr = (wins*3 - losses).toFixed(1);
+  const wrEl = document.getElementById('smcStatWR');
+  const pfEl = document.getElementById('smcStatPF');
+  const rEl  = document.getElementById('smcStatR');
+  if(wrEl) { wrEl.textContent = wr+'%'; wrEl.style.color = wr>=33?'#10b981':'#ef4444'; }
+  if(pfEl) { pfEl.textContent = pf; pfEl.style.color = parseFloat(pf)>=1?'#fbbf24':'#ef4444'; }
+  if(rEl)  { rEl.textContent = (netr>0?'+':'')+netr+'R'; rEl.style.color = netr>=0?'#3b82f6':'#ef4444'; }
 }
 
 function renderSMCScanPanel(history, lastScan) {
