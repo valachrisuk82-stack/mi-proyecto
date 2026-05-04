@@ -233,7 +233,7 @@ canvas{position:absolute;top:0;left:0}
 .ai-panel-title{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)}
 .ai-panel-arrow{font-size:12px;color:var(--neon-up);transition:transform .3s}
 .ai-panel.collapsed .ai-panel-arrow{transform:rotate(180deg)}
-.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
+.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
 .ai-col{padding:10px 14px;border-right:1px solid var(--border);overflow-y:auto}
 .ai-col:last-child{border-right:none}
 .ai-col-title{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px;font-family:'Syne',sans-serif}
@@ -379,7 +379,7 @@ canvas{position:absolute;top:0;left:0}
 
 <div class="ai-panel" id="aiPanel">
   <div class="ai-panel-toggle" onclick="toggleAiPanel()">
-    <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN</span>
+    <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN + JOURNAL</span>
     <span class="ai-panel-arrow" id="panelArrow">▲</span>
   </div>
   <div class="ai-panel-body">
@@ -443,6 +443,38 @@ canvas{position:absolute;top:0;left:0}
       </div>
     </div>
 
+    <!-- COL 6: JOURNAL -->
+    <div class="ai-col" style="border-left:1px solid rgba(245,158,11,0.2)">
+      <div class="ai-col-title" style="color:#f59e0b">JOURNAL</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;margin-bottom:5px">
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:3px;padding:2px;text-align:center">
+          <div style="color:#64748b;font:5px JetBrains Mono,monospace">WR%</div>
+          <div id="jWR" style="color:#10b981;font:bold 10px JetBrains Mono,monospace">--%</div>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:3px;padding:2px;text-align:center">
+          <div style="color:#64748b;font:5px JetBrains Mono,monospace">PF</div>
+          <div id="jPF" style="color:#fbbf24;font:bold 10px JetBrains Mono,monospace">--</div>
+        </div>
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:3px;padding:2px;text-align:center">
+          <div style="color:#64748b;font:5px JetBrains Mono,monospace">NET R</div>
+          <div id="jNetR" style="color:#3b82f6;font:bold 10px JetBrains Mono,monospace">--</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:5px">
+        <div style="background:rgba(2,3,10,0.5);border:1px solid rgba(255,255,255,0.06);border-radius:3px;padding:2px;text-align:center">
+          <div style="color:#64748b;font:5px JetBrains Mono,monospace">ABIERTAS</div>
+          <div id="jOpen" style="color:#10b981;font:bold 10px JetBrains Mono,monospace">0/3</div>
+        </div>
+        <div style="background:rgba(2,3,10,0.5);border:1px solid rgba(255,255,255,0.06);border-radius:3px;padding:2px;text-align:center">
+          <div style="color:#64748b;font:5px JetBrains Mono,monospace">HOY</div>
+          <div id="jToday" style="color:#fbbf24;font:bold 10px JetBrains Mono,monospace">+0R</div>
+        </div>
+      </div>
+      <div id="jBlocked" style="text-align:center;font:bold 8px JetBrains Mono,monospace;color:#10b981;margin-bottom:4px">✅ ACTIVO</div>
+      <div id="jTradeList" style="overflow-y:auto;max-height:110px;display:flex;flex-direction:column;gap:2px">
+        <div style="color:#475569;font:7px JetBrains Mono,monospace;text-align:center;padding:10px 0">Sin operaciones registradas</div>
+      </div>
+    </div>
     <!-- COL 5: SMC SCANNER -->
     <div class="ai-col" style="border-left:1px solid rgba(168,85,247,0.2)">
       <div class="ai-col-title" style="color:#a855f7">SMC SCANNER</div>
@@ -1127,6 +1159,78 @@ function detectSMC(candles) {
 }
 
 
+
+// ── JOURNAL + RISK MANAGER UI ──
+function showBlockedToast(reason) {
+  const existing = document.getElementById('blockedToast');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'blockedToast';
+  div.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;z-index:9999;font-family:JetBrains Mono,monospace;font-size:11px;color:#e2e8f0;min-width:220px;box-shadow:0 0 20px rgba(245,158,11,0.3)';
+  div.innerHTML = `
+    <div style="color:#f59e0b;font-weight:bold;font-size:12px;margin-bottom:4px">🛡️ RISK MANAGER</div>
+    <div style="color:#94a3b8">${reason}</div>
+    <div onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:10px;cursor:pointer;color:#64748b">✕</div>
+  `;
+  document.body.appendChild(div);
+  setTimeout(() => div?.remove(), 8000);
+}
+
+async function loadJournal() {
+  try {
+    const [statsR, tradesR] = await Promise.all([
+      fetch(`${API_BASE}/journal/stats`),
+      fetch(`${API_BASE}/journal/trades`)
+    ]);
+    const stats  = await statsR.json();
+    const trades = await tradesR.json();
+    renderJournalStats(stats);
+    renderJournalTrades(trades);
+  } catch(e) {}
+}
+
+function renderJournalStats(s) {
+  const el = id => document.getElementById(id);
+  if(el('jWR'))  { el('jWR').textContent  = s.wr+'%';    el('jWR').style.color  = s.wr>=33?'#10b981':'#ef4444'; }
+  if(el('jPF'))  { el('jPF').textContent  = s.pf;        el('jPF').style.color  = s.pf>=1?'#fbbf24':'#ef4444'; }
+  if(el('jNetR')){ el('jNetR').textContent= (s.net_r>=0?'+':'')+s.net_r+'R'; el('jNetR').style.color = s.net_r>=0?'#3b82f6':'#ef4444'; }
+  if(el('jOpen')){ el('jOpen').textContent= s.open_trades+'/3'; el('jOpen').style.color = s.open_trades>=3?'#ef4444':'#10b981'; }
+  if(el('jToday')){ el('jToday').textContent= (s.today_net>=0?'+':'')+s.today_net+'R'; el('jToday').style.color = s.today_net>=-3?'#fbbf24':'#ef4444'; }
+  if(el('jBlocked')){ el('jBlocked').textContent = s.blocked?'🛑 BLOQUEADO':'✅ ACTIVO'; el('jBlocked').style.color = s.blocked?'#ef4444':'#10b981'; }
+}
+
+function renderJournalTrades(trades) {
+  const list = document.getElementById('jTradeList');
+  if (!list || !trades.length) return;
+  list.innerHTML = trades.map(t => {
+    const isOpen = t.outcome==='OPEN';
+    const isWin  = t.outcome==='WIN';
+    const color  = isOpen?'#f59e0b':isWin?'#10b981':'#ef4444';
+    const bg     = isOpen?'rgba(245,158,11,0.06)':isWin?'rgba(16,185,129,0.06)':'rgba(244,63,94,0.06)';
+    const dir    = t.signal==='LONG'?'🟢':'🔴';
+    return `<div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="color:${color};font:bold 8px JetBrains Mono,monospace">${dir} ${t.pair.replace('USDT','')} ${t.signal}</span>
+      <span style="color:#94a3b8;font:7px JetBrains Mono,monospace">$${t.entry?.toLocaleString()}</span>
+      <span style="color:${color};font:bold 8px JetBrains Mono,monospace">${isOpen?'OPEN':t.outcome} ${isOpen?'':( (t.pnl_r>0?'+':'')+t.pnl_r+'R')}</span>
+      ${isOpen?`<span onclick="closeTradeManual(${t.trade_id||0},'WIN')" style="color:#10b981;cursor:pointer;font:8px JetBrains Mono,monospace">✓W</span>
+               <span onclick="closeTradeManual(${t.trade_id||0},'LOSS')" style="color:#ef4444;cursor:pointer;font:8px JetBrains Mono,monospace">✗L</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function closeTradeManual(trade_id, outcome) {
+  if (!trade_id) return;
+  await fetch(`${API_BASE}/journal/close_trade`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({trade_id, outcome})
+  });
+  loadJournal();
+}
+
+// Cargar journal al arrancar y cada 5 min
+setTimeout(loadJournal, 4000);
+setInterval(loadJournal, 300000);
+
 // ── SMC SCANNER PANEL ──
 async function runSMCScan() {
   const btn = document.querySelector('[onclick="runSMCScan()"]');
@@ -1242,12 +1346,25 @@ function checkSMCSignal(candles) {
   console.log(`🎯 SMC Signal: ${signal} ${S.pair} — Conf: ${conf}%`);
   
   // Enviar al backend → Telegram
+  // Confirmación triple: ML Score + MTF
+  const mlScore = S.mlScores[S.pair] || 0;
+  const mtfData = S.sigs[S.pair]?.mtf || {};
+  const mtfOk = signal === 'LONG'
+    ? (mtfData.m5 === 'ALCISTA' && mtfData.m15 === 'ALCISTA')
+    : (mtfData.m5 === 'BAJISTA' && mtfData.m15 === 'BAJISTA');
+
   fetch(`${API_BASE}/smc_signal`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ pair: S.pair, signal, entry, sl, tp, ob_type, fvg, bos, confidence: conf })
+    body: JSON.stringify({ pair: S.pair, signal, entry, sl, tp, ob_type, fvg, bos,
+                           confidence: conf, ml_score: mlScore, mtf_ok: mtfOk })
   }).then(r => r.json()).then(d => {
-    if (d.ok) showSMCToast(signal, entry, sl, tp, conf, d.rr);
+    if (d.ok) {
+      showSMCToast(signal, entry, sl, tp, conf, d.rr);
+      loadJournal();
+    } else if (d.blocked) {
+      showBlockedToast(d.reason);
+    }
   }).catch(() => {});
 }
 

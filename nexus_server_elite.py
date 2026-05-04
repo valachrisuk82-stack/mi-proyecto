@@ -61,6 +61,133 @@ def send_telegram(message):
         requests.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}, timeout=5)
     except: pass
 
+
+# ══════════════════════════════════════════════════════════════════
+#  JOURNAL + RISK MANAGER
+# ══════════════════════════════════════════════════════════════════
+import sqlite3 as _sq
+
+JOURNAL_DB = "nexus_journal.db"
+
+def journal_init():
+    con = _sq.connect(JOURNAL_DB)
+    con.execute("""CREATE TABLE IF NOT EXISTS trades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT, pair TEXT, signal TEXT,
+        entry REAL, sl REAL, tp REAL, rr REAL,
+        confidence INTEGER, ml_score INTEGER, source TEXT,
+        outcome TEXT DEFAULT 'OPEN',
+        pnl_r REAL DEFAULT 0,
+        closed_at TEXT DEFAULT NULL
+    )""")
+    con.execute("""CREATE TABLE IF NOT EXISTS daily_stats (
+        date TEXT PRIMARY KEY,
+        trades INTEGER DEFAULT 0,
+        wins INTEGER DEFAULT 0,
+        losses INTEGER DEFAULT 0,
+        net_r REAL DEFAULT 0,
+        blocked INTEGER DEFAULT 0
+    )""")
+    con.commit(); con.close()
+
+def journal_add(pair, signal, entry, sl, tp, rr, conf, ml_score, source="SMC"):
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Risk manager — max 3 operaciones abiertas
+    con = _sq.connect(JOURNAL_DB)
+    open_trades = con.execute("SELECT COUNT(*) FROM trades WHERE outcome='OPEN'").fetchone()[0]
+    blocked = con.execute("SELECT blocked FROM daily_stats WHERE date=?", (today,)).fetchone()
+    blocked = blocked[0] if blocked else 0
+    if blocked:
+        con.close()
+        return None, "BLOQUEADO: stop diario alcanzado"
+    if open_trades >= 3:
+        con.close()
+        return None, f"BLOQUEADO: {open_trades} operaciones abiertas"
+    # R:R mínimo 2:1
+    if rr < 2.0:
+        con.close()
+        return None, f"BLOQUEADO: R:R {rr:.1f} < 2.0"
+    cur = con.execute("""INSERT INTO trades
+        (ts, pair, signal, entry, sl, tp, rr, confidence, ml_score, source)
+        VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pair, signal,
+         entry, sl, tp, rr, conf, ml_score, source))
+    trade_id = cur.lastrowid
+    # Actualizar daily_stats
+    con.execute("""INSERT INTO daily_stats(date,trades) VALUES(?,1)
+        ON CONFLICT(date) DO UPDATE SET trades=trades+1""", (today,))
+    con.commit(); con.close()
+    return trade_id, "OK"
+
+def journal_close_open_trades():
+    """Verifica trades abiertos y cierra los que tocaron SL o TP"""
+    con = _sq.connect(JOURNAL_DB)
+    open_trades = con.execute(
+        "SELECT id,pair,signal,entry,sl,tp FROM trades WHERE outcome='OPEN'").fetchall()
+    for tid, pair, signal, entry, sl, tp in open_trades:
+        try:
+            r = requests.get(f"https://api.binance.com/api/v3/ticker/price",
+                           params={"symbol": pair}, timeout=3)
+            price = float(r.json()["price"])
+            outcome = None
+            pnl_r   = 0
+            if signal == "LONG":
+                if price <= sl:   outcome, pnl_r = "LOSS", -1.0
+                elif price >= tp: outcome, pnl_r = "WIN",   3.0
+            else:
+                if price >= sl:   outcome, pnl_r = "LOSS", -1.0
+                elif price <= tp: outcome, pnl_r = "WIN",   3.0
+            if outcome:
+                now = datetime.now()
+                today = now.strftime("%Y-%m-%d")
+                con.execute("""UPDATE trades SET outcome=?, pnl_r=?, closed_at=? WHERE id=?""",
+                           (outcome, pnl_r, now.strftime("%Y-%m-%d %H:%M:%S"), tid))
+                col = "wins" if outcome=="WIN" else "losses"
+                con.execute(f"""INSERT INTO daily_stats(date,{col},net_r) VALUES(?,1,?)
+                    ON CONFLICT(date) DO UPDATE SET {col}={col}+1, net_r=net_r+?""",
+                    (today, pnl_r, pnl_r))
+                # Stop diario: si net_r <= -3R bloquear
+                net = con.execute("SELECT net_r FROM daily_stats WHERE date=?", (today,)).fetchone()
+                if net and net[0] <= -3.0:
+                    con.execute("""INSERT INTO daily_stats(date,blocked) VALUES(?,1)
+                        ON CONFLICT(date) DO UPDATE SET blocked=1""", (today,))
+                    send_telegram(f"🛑 <b>NEXUS APEX — STOP DIARIO</b>\nPérdida de {net[0]:.1f}R alcanzada.\nSistema bloqueado hasta mañana.")
+                con.commit()
+        except: pass
+    con.close()
+
+def journal_stats():
+    con = _sq.connect(JOURNAL_DB)
+    rows = con.execute("""SELECT outcome, pnl_r FROM trades
+        WHERE outcome != 'OPEN' ORDER BY id DESC LIMIT 100""").fetchall()
+    today = datetime.now().strftime("%Y-%m-%d")
+    day = con.execute("SELECT * FROM daily_stats WHERE date=?", (today,)).fetchone()
+    open_c = con.execute("SELECT COUNT(*) FROM trades WHERE outcome='OPEN'").fetchone()[0]
+    con.close()
+    wins   = sum(1 for r in rows if r[0]=="WIN")
+    losses = sum(1 for r in rows if r[0]=="LOSS")
+    total  = wins+losses
+    wr     = round(wins/total*100, 1) if total else 0
+    pf     = round(wins*3/losses, 2) if losses else 0
+    net_r  = round(sum(r[1] for r in rows), 1)
+    blocked= bool(day[5]) if day else False
+    return {
+        "wins": wins, "losses": losses, "total": total,
+        "wr": wr, "pf": pf, "net_r": net_r,
+        "open_trades": open_c, "blocked": blocked,
+        "today_net": round(day[4],1) if day else 0
+    }
+
+def journal_recent(limit=20):
+    con = _sq.connect(JOURNAL_DB)
+    rows = con.execute("""SELECT ts,pair,signal,entry,sl,tp,rr,confidence,ml_score,outcome,pnl_r,source
+        FROM trades ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
+    con.close()
+    keys = ["ts","pair","signal","entry","sl","tp","rr","confidence","ml_score","outcome","pnl_r","source"]
+    return [dict(zip(keys,r)) for r in rows]
+
+journal_init()
+
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
     emoji = "🟢" if signal == "BUY" else "🔴"
     sent_emoji = "😊" if news_sent > 0 else "😰" if news_sent < 0 else "😐"
@@ -1462,17 +1589,29 @@ def smc_signal():
             f"⚡ NEXUS APEX — Smart Money"
         )
 
+        # Confirmación triple: ML Score
+        ml_score = int(data.get("ml_score", 0))
+        mtf_ok   = bool(data.get("mtf_ok", False))
+        if signal == "LONG"  and ml_score < 60:
+            return jsonify({"ok": False, "blocked": True, "reason": f"ML Score {ml_score} < 60 para LONG"})
+        if signal == "SHORT" and ml_score > 40:
+            return jsonify({"ok": False, "blocked": True, "reason": f"ML Score {ml_score} > 40 para SHORT"})
+        if not mtf_ok:
+            return jsonify({"ok": False, "blocked": True, "reason": "MTF no confirma la dirección"})
+
+        # Risk manager — añadir al journal
+        trade_id, status = journal_add(pair, signal, entry, sl, tp, rr, conf, ml_score, "SMC")
+        if trade_id is None:
+            return jsonify({"ok": False, "blocked": True, "reason": status})
+
         send_telegram(msg)
         cache["history"].insert(0, {
             "time": datetime.now().strftime("%H:%M:%S"),
-            "pair": pair,
-            "signal": signal,
-            "confidence": conf,
-            "price": entry,
-            "ml_score": conf,
-            "source": "SMC"
+            "pair": pair, "signal": signal,
+            "confidence": conf, "price": entry,
+            "ml_score": ml_score, "source": "SMC"
         })
-        return jsonify({"ok": True, "rr": rr})
+        return jsonify({"ok": True, "rr": rr, "trade_id": trade_id})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
@@ -1599,6 +1738,37 @@ def scan_smc_all_pairs():
             send_telegram(msg)
     return results
 
+
+@app.route("/api/journal/stats")
+def journal_stats_api():
+    return jsonify(journal_stats())
+
+@app.route("/api/journal/trades")
+def journal_trades_api():
+    return jsonify(journal_recent(30))
+
+@app.route("/api/journal/close_trade", methods=["POST"])
+def close_trade_manual():
+    try:
+        data = request.get_json()
+        tid  = data.get("trade_id")
+        outcome = data.get("outcome")  # WIN o LOSS
+        if not tid or outcome not in ("WIN","LOSS"):
+            return jsonify({"ok": False})
+        pnl_r = 3.0 if outcome=="WIN" else -1.0
+        today = datetime.now().strftime("%Y-%m-%d")
+        con = __import__("sqlite3").connect(JOURNAL_DB)
+        con.execute("UPDATE trades SET outcome=?, pnl_r=?, closed_at=? WHERE id=?",
+                   (outcome, pnl_r, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), tid))
+        col = "wins" if outcome=="WIN" else "losses"
+        con.execute(f"""INSERT INTO daily_stats(date,{col},net_r) VALUES(?,1,?)
+            ON CONFLICT(date) DO UPDATE SET {col}={col}+1, net_r=net_r+?""",
+            (today, pnl_r, pnl_r))
+        con.commit(); con.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
@@ -1619,6 +1789,10 @@ threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
+threading.Thread(target=lambda: [
+    __import__("time").sleep(1800) or journal_close_open_trades()
+    for _ in iter(int, 1)
+], daemon=True).start()
 print("\n  ✅ Servidor listo en http://localhost:5001")
 print("  → Abre nexus_elite.html en tu navegador\n")
 
