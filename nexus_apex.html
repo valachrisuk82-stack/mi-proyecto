@@ -1100,7 +1100,7 @@ function checkSMCSignal(candles) {
   if (bullFVG) { conf += 30; fvg = true; }
   if (bullBOS) { conf += 30; bos = bullBOS.type; }
 
-  if (conf >= 70 && bullOB) {
+  if (conf === 100 && bullOB) {  // v2: requiere OB+FVG+BOS
     signal = 'LONG';
     entry  = price;
     sl     = bullOB.low - atr * 0.5;
@@ -1118,7 +1118,7 @@ function checkSMCSignal(candles) {
     if (bearFVG) { conf += 30; fvg = true; }
     if (bearBOS) { conf += 30; bos = bearBOS?.type || 'BOS'; }
 
-    if (conf >= 70 && bearOB) {
+    if (conf === 100 && bearOB) {  // v2: requiere OB+FVG+BOS
       signal = 'SHORT';
       entry  = price;
       sl     = bearOB.high + atr * 0.5;
