@@ -1,0 +1,7 @@
+nexus_journal.db
+waitlist.txt
+*.db
+backtest_smc_results.csv
+backtest_smc_v2_results.csv
+backtest_smc_v3_results.csv
+backtest_smc_v4_results.csv
