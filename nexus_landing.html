@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS APEX — Dashboard de Trading Profesional</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--neon:#00ff88;--cyan:#00e5ff;--gold:#ffe600;--dn:#ff0055;--bg:#02030a;--deep:#060912;--surface:#0a0e1a}
+body{background:var(--bg);color:#eef0f8;font-family:'JetBrains Mono',monospace;overflow-x:hidden}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 40px;border-bottom:1px solid rgba(0,255,136,0.08);position:sticky;top:0;background:rgba(2,3,10,0.95);backdrop-filter:blur(20px);z-index:100}
+.nav-logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--neon);letter-spacing:3px}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-link{color:#64748b;font-size:10px;letter-spacing:2px;text-decoration:none;transition:color .2s}
+.nav-link:hover{color:var(--neon)}
+.nav-cta{padding:8px 20px;background:var(--neon);color:#02030a;font:bold 10px 'JetBrains Mono',monospace;border:none;border-radius:5px;cursor:pointer;letter-spacing:2px;text-decoration:none;transition:all .2s}
+.nav-cta:hover{box-shadow:0 0 20px rgba(0,255,136,0.4)}
+
+/* HERO */
+.hero{min-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 32px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,0.08),transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:20px;padding:6px 16px;font-size:9px;color:var(--neon);letter-spacing:3px;margin-bottom:24px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--neon);animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(36px,6vw,72px);font-weight:800;line-height:1.1;margin-bottom:16px;max-width:800px}
+.hero h1 span{background:linear-gradient(135deg,var(--neon),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:13px;color:#64748b;max-width:500px;line-height:1.8;margin-bottom:40px;letter-spacing:0.5px}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:60px}
+.btn-primary{padding:14px 36px;background:var(--neon);color:#02030a;font:bold 11px 'JetBrains Mono',monospace;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;text-decoration:none;display:inline-block;transition:all .2s}
+.btn-primary:hover{box-shadow:0 0 30px rgba(0,255,136,0.5);transform:translateY(-1px)}
+.btn-secondary{padding:14px 36px;background:none;color:var(--neon);font:bold 11px 'JetBrains Mono',monospace;border:1px solid rgba(0,255,136,0.3);border-radius:6px;cursor:pointer;letter-spacing:2px;text-decoration:none;display:inline-block;transition:all .2s}
+.btn-secondary:hover{background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.6)}
+
+/* LIVE STATS */
+.live-stats{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:24px 40px;background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.08);border-radius:12px;max-width:800px;margin:0 auto}
+.live-stat{text-align:center}
+.live-stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--neon)}
+.live-stat-label{font-size:8px;letter-spacing:2px;color:#475569;margin-top:4px}
+
+/* FEATURES */
+.section{padding:80px 40px;max-width:1100px;margin:0 auto}
+.section-label{font-size:8px;letter-spacing:4px;color:var(--neon);text-transform:uppercase;margin-bottom:12px}
+.section-title{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,40px);font-weight:800;margin-bottom:16px}
+.section-sub{color:#64748b;font-size:11px;line-height:1.8;max-width:500px;margin-bottom:48px}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.feature{background:var(--deep);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px;transition:all .2s}
+.feature:hover{border-color:rgba(0,255,136,0.2);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.feature-icon{font-size:24px;margin-bottom:12px}
+.feature-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:8px;color:white}
+.feature-desc{font-size:10px;color:#64748b;line-height:1.7}
+
+/* PRICING */
+.pricing{padding:80px 40px;text-align:center}
+.pricing-title{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,40px);font-weight:800;margin-bottom:8px}
+.pricing-sub{color:#64748b;font-size:11px;margin-bottom:48px}
+.plans{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;max-width:900px;margin:0 auto}
+.plan{background:var(--deep);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;flex:1;min-width:240px;max-width:280px;position:relative;transition:all .2s}
+.plan:hover{transform:translateY(-4px)}
+.plan.featured{border-color:rgba(0,255,136,0.4);background:linear-gradient(135deg,rgba(0,255,136,0.04),var(--deep));box-shadow:0 0 40px rgba(0,255,136,0.1)}
+.plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--neon);color:#02030a;font:bold 8px 'JetBrains Mono',monospace;padding:4px 16px;border-radius:10px;letter-spacing:2px;white-space:nowrap}
+.plan-name{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:8px}
+.plan-price{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--neon);margin-bottom:4px}
+.plan-price span{font-size:14px;color:#64748b;font-family:'JetBrains Mono',monospace}
+.plan-period{font-size:9px;color:#475569;margin-bottom:24px;letter-spacing:1px}
+.plan-features{list-style:none;margin-bottom:28px;text-align:left}
+.plan-features li{font-size:10px;color:#94a3b8;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:8px}
+.plan-features li::before{content:'✓';color:var(--neon);font-weight:800;flex-shrink:0}
+.plan-features li.no::before{content:'✗';color:#334155}
+.plan-features li.no{color:#334155}
+.plan-btn{width:100%;padding:12px;font:bold 10px 'JetBrains Mono',monospace;border-radius:6px;cursor:pointer;letter-spacing:2px;transition:all .2s;text-decoration:none;display:block;text-align:center}
+.plan-btn.free{background:none;border:1px solid rgba(255,255,255,0.1);color:#64748b}
+.plan-btn.free:hover{border-color:rgba(255,255,255,0.2);color:white}
+.plan-btn.pro{background:var(--neon);border:none;color:#02030a}
+.plan-btn.pro:hover{box-shadow:0 0 24px rgba(0,255,136,0.4)}
+.plan-btn.elite{background:linear-gradient(135deg,var(--neon),var(--cyan));border:none;color:#02030a}
+.plan-btn.elite:hover{box-shadow:0 0 24px rgba(0,229,255,0.4)}
+.plan-note{font-size:8px;color:#334155;margin-top:8px;text-align:center}
+
+/* TRACK PREVIEW */
+.track-preview{background:var(--deep);border:1px solid rgba(0,255,136,0.1);border-radius:16px;padding:32px;margin:0 40px 80px;max-width:1020px;margin-left:auto;margin-right:auto}
+.track-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.track-kpis{display:flex;gap:24px;flex-wrap:wrap}
+.track-kpi{text-align:center}
+.track-kpi-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+.track-kpi-label{font-size:7px;letter-spacing:2px;color:#475569}
+
+/* WAITLIST */
+.waitlist{background:linear-gradient(135deg,rgba(0,255,136,0.06),rgba(0,229,255,0.03));border:1px solid rgba(0,255,136,0.15);border-radius:16px;padding:60px 40px;text-align:center;margin:0 40px 80px;max-width:700px;margin-left:auto;margin-right:auto}
+.waitlist h2{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px}
+.waitlist p{color:#64748b;font-size:11px;line-height:1.8;margin-bottom:28px}
+.waitlist-form{display:flex;gap:8px;max-width:400px;margin:0 auto;flex-wrap:wrap;justify-content:center}
+.waitlist-input{flex:1;min-width:200px;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:white;font:11px 'JetBrains Mono',monospace;outline:none;transition:border-color .2s}
+.waitlist-input:focus{border-color:rgba(0,255,136,0.4)}
+.waitlist-input::placeholder{color:#334155}
+.waitlist-btn{padding:12px 24px;background:var(--neon);color:#02030a;font:bold 10px 'JetBrains Mono',monospace;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;transition:all .2s;white-space:nowrap}
+.waitlist-btn:hover{box-shadow:0 0 20px rgba(0,255,136,0.4)}
+.waitlist-count{font-size:9px;color:#475569;margin-top:12px}
+
+/* DISCLAIMER */
+.disclaimer-bar{background:rgba(245,158,11,0.04);border-top:1px solid rgba(245,158,11,0.1);padding:16px 40px;font-size:9px;color:#475569;text-align:center;line-height:1.7}
+
+/* FOOTER */
+footer{background:var(--deep);border-top:1px solid rgba(255,255,255,0.04);padding:32px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:gap;gap:16px}
+.footer-logo{font-family:'Syne',sans-serif;font-size:14px;color:var(--neon);letter-spacing:3px}
+.footer-links{display:flex;gap:20px}
+.footer-link{color:#334155;font-size:9px;letter-spacing:1px;text-decoration:none;transition:color .2s}
+.footer-link:hover{color:#64748b}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">⚡ NEXUS APEX</div>
+  <div class="nav-links">
+    <a href="#features" class="nav-link">FEATURES</a>
+    <a href="#pricing" class="nav-link">PRECIOS</a>
+    <a href="/track" class="nav-link">TRACK RECORD</a>
+    <a href="/login" class="nav-cta">ACCEDER</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge"><div class="dot"></div> PAPER TRADING EN VIVO — RESULTADOS VERIFICADOS</div>
+  <h1>El Dashboard de Trading<br><span>Más Transparente</span> del Mercado</h1>
+  <p class="hero-sub">SMC + Machine Learning + Multi-Timeframe. Señales con triple confirmación. Track record público y verificable desde el día 1.</p>
+  <div class="hero-btns">
+    <a href="#waitlist" class="btn-primary">UNIRME A LA LISTA DE ESPERA</a>
+    <a href="/track" class="btn-secondary">VER TRACK RECORD EN VIVO</a>
+  </div>
+  <div class="live-stats">
+    <div class="live-stat"><div class="live-stat-val" id="heroWR">--%</div><div class="live-stat-label">WIN RATE</div></div>
+    <div class="live-stat"><div class="live-stat-val" id="heroPF">--</div><div class="live-stat-label">PROFIT FACTOR</div></div>
+    <div class="live-stat"><div class="live-stat-val" id="heroR">--</div><div class="live-stat-label">NET R TOTAL</div></div>
+    <div class="live-stat"><div class="live-stat-val" id="heroTrades">--</div><div class="live-stat-label">TRADES REGISTRADOS</div></div>
+    <div class="live-stat"><div class="live-stat-val" style="color:#f59e0b" id="heroDays">--</div><div class="live-stat-label">DÍAS CORRIENDO</div></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="section" id="features">
+  <div class="section-label">Por qué NEXUS APEX</div>
+  <div class="section-title">Todo lo que necesitas.<br>Nada que no necesitas.</div>
+  <div class="section-sub">Construido por un trader, para traders. Sin promesas vacías — solo datos reales y herramientas que funcionan.</div>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">SMC en el Chart</div>
+      <div class="feature-desc">Order Blocks, Fair Value Gaps y Break of Structure detectados automáticamente. Zonas de liquidez BSL/SSL en tiempo real.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🧠</div>
+      <div class="feature-title">Triple Confirmación</div>
+      <div class="feature-desc">Cada señal pasa por SMC + ML Score + Multi-Timeframe antes de generarse. Sin ruido, solo setups de alta probabilidad.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-title">Risk Manager</div>
+      <div class="feature-desc">Máximo 1% por operación. Stop diario automático de -3R. Máximo 3 operaciones simultáneas. Tu capital, protegido.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📰</div>
+      <div class="feature-title">Filtro Macro</div>
+      <div class="feature-desc">Bloqueo automático 30 minutos antes y después de eventos de alto impacto. El sistema sabe cuándo no operar.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🌍</div>
+      <div class="feature-title">Multi-Par & Multi-TF</div>
+      <div class="feature-desc">Escanea 24 pares crypto en 1H cada 5 minutos. Sessions Asia, Londres y Nueva York marcadas en el chart.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✅</div>
+      <div class="feature-title">Track Record Público</div>
+      <div class="feature-desc">Cada señal generada queda registrada públicamente. Sin cherry-picking, sin editar. Transparencia total desde el día 1.</div>
+    </div>
+  </div>
+</div>
+
+<!-- TRACK PREVIEW -->
+<div class="track-preview">
+  <div class="track-header">
+    <div>
+      <div style="font-size:8px;letter-spacing:3px;color:#475569;margin-bottom:4px">PAPER TRADING EN VIVO</div>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800">Resultados verificados en tiempo real</div>
+    </div>
+    <a href="/track" class="btn-secondary" style="font-size:9px;padding:8px 20px">VER COMPLETO →</a>
+  </div>
+  <div class="track-kpis" id="trackKPIs">
+    <div class="track-kpi"><div class="track-kpi-val green" id="tkWR">--%</div><div class="track-kpi-label">WIN RATE</div></div>
+    <div class="track-kpi"><div class="track-kpi-val yellow" id="tkPF">--</div><div class="track-kpi-label">PROFIT FACTOR</div></div>
+    <div class="track-kpi"><div class="track-kpi-val blue" id="tkR">--</div><div class="track-kpi-label">NET R</div></div>
+    <div class="track-kpi"><div class="track-kpi-val" id="tkTotal" style="color:#a855f7">--</div><div class="track-kpi-label">TRADES</div></div>
+    <div class="track-kpi"><div class="track-kpi-val" id="tkDD" style="color:#ef4444">--</div><div class="track-kpi-label">MAX DD</div></div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<div class="pricing" id="pricing">
+  <div style="font-size:8px;letter-spacing:4px;color:var(--neon);margin-bottom:12px">PLANES</div>
+  <div class="pricing-title">Simple y transparente</div>
+  <div class="pricing-sub">Acceso gratuito al track record. Premium cuando el sistema demuestre su edge.</div>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-name">FREE</div>
+      <div class="plan-price">$0<span>/mes</span></div>
+      <div class="plan-period">SIEMPRE GRATIS</div>
+      <ul class="plan-features">
+        <li>Track record público</li>
+        <li>Stats en tiempo real</li>
+        <li>Curva de equity</li>
+        <li class="no">Dashboard completo</li>
+        <li class="no">Señales en tiempo real</li>
+        <li class="no">Alertas Telegram</li>
+        <li class="no">Risk Manager</li>
+      </ul>
+      <a href="/track" class="plan-btn free">VER TRACK RECORD</a>
+    </div>
+    <div class="plan featured">
+      <div class="plan-badge">MÁS POPULAR</div>
+      <div class="plan-name">PRO</div>
+      <div class="plan-price">$49<span>/mes</span></div>
+      <div class="plan-period">DISPONIBLE PRONTO — LISTA DE ESPERA</div>
+      <ul class="plan-features">
+        <li>Todo lo de Free</li>
+        <li>Dashboard completo</li>
+        <li>Señales SMC en tiempo real</li>
+        <li>Alertas Telegram personales</li>
+        <li>Risk Manager activo</li>
+        <li>Scanner multi-par 24/7</li>
+        <li class="no">API access</li>
+      </ul>
+      <a href="#waitlist" class="plan-btn pro">LISTA DE ESPERA</a>
+      <div class="plan-note">Abrimos cuando tengamos 200+ trades verificados</div>
+    </div>
+    <div class="plan">
+      <div class="plan-name">ELITE</div>
+      <div class="plan-price">$99<span>/mes</span></div>
+      <div class="plan-period">DISPONIBLE PRONTO</div>
+      <ul class="plan-features">
+        <li>Todo lo de Pro</li>
+        <li>API access completo</li>
+        <li>Backtesting personalizado</li>
+        <li>Soporte prioritario</li>
+        <li>Stats dashboard avanzado</li>
+        <li>Parámetros personalizables</li>
+        <li>Acceso anticipado features</li>
+      </ul>
+      <a href="#waitlist" class="plan-btn elite">LISTA DE ESPERA</a>
+    </div>
+  </div>
+</div>
+
+<!-- WAITLIST -->
+<div class="waitlist" id="waitlist">
+  <h2>Únete a la lista de espera</h2>
+  <p>Serás el primero en saber cuando abramos acceso premium.<br>Los primeros 50 suscriptores obtienen 3 meses al precio de lanzamiento.</p>
+  <div class="waitlist-form">
+    <input type="email" class="waitlist-input" id="waitEmail" placeholder="tu@email.com">
+    <button class="waitlist-btn" onclick="joinWaitlist()">UNIRME</button>
+  </div>
+  <div class="waitlist-count" id="waitCount">Cargando lista de espera...</div>
+</div>
+
+<div class="disclaimer-bar">
+  ⚠️ AVISO DE RIESGO: Los resultados pasados no garantizan resultados futuros. El trading de criptomonedas conlleva riesgo significativo de pérdida. NEXUS APEX es una herramienta de análisis, no un asesor financiero regulado. No inviertas dinero que no puedas permitirte perder.
+</div>
+
+<footer>
+  <div class="footer-logo">⚡ NEXUS APEX</div>
+  <div class="footer-links">
+    <a href="/track" class="footer-link">TRACK RECORD</a>
+    <a href="/stats" class="footer-link">STATS</a>
+    <a href="/login" class="footer-link">ACCEDER</a>
+  </div>
+  <div style="font-size:8px;color:#1e293b;letter-spacing:1px">© 2026 NEXUS APEX</div>
+</footer>
+
+<script>
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:5001/api' : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/paper/stats`);
+    const d = await r.json();
+    const set = (id,val) => { const e=document.getElementById(id); if(e) e.textContent=val; };
+    set('heroWR',   d.wr+'%');
+    set('heroPF',   d.pf||'--');
+    set('heroR',    (d.net_r>=0?'+':'')+d.net_r+'R');
+    set('heroTrades', d.total||0);
+    set('heroDays', (d.days_running||0)+'d');
+    set('tkWR',    d.wr+'%');
+    set('tkPF',    d.pf||'--');
+    set('tkR',     (d.net_r>=0?'+':'')+d.net_r+'R');
+    set('tkTotal', d.total||0);
+    set('tkDD',    d.max_dd+'R');
+  } catch(e) {}
+}
+
+async function joinWaitlist() {
+  const email = document.getElementById('waitEmail').value;
+  if (!email || !email.includes('@')) {
+    alert('Por favor ingresa un email válido');
+    return;
+  }
+  try {
+    const r = await fetch(`${API}/waitlist`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email})
+    });
+    const d = await r.json();
+    if(d.ok) {
+      document.getElementById('waitEmail').value = '';
+      document.getElementById('waitCount').textContent = `✅ Añadido. ${d.count} personas en lista de espera.`;
+      document.getElementById('waitCount').style.color = '#10b981';
+    }
+  } catch(e) {
+    document.getElementById('waitCount').textContent = '✅ Te contactaremos pronto.';
+    document.getElementById('waitCount').style.color = '#10b981';
+  }
+}
+
+loadStats();
+setInterval(loadStats, 60000);
+
+// Cargar conteo de waitlist
+fetch(`${API}/waitlist`).then(r=>r.json()).then(d=>{
+  const el = document.getElementById('waitCount');
+  if(el) el.textContent = `${d.count||0} personas en lista de espera`;
+}).catch(()=>{
+  const el = document.getElementById('waitCount');
+  if(el) el.textContent = 'Sé el primero en unirte';
+});
+</script>
+</body>
+</html>

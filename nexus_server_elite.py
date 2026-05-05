@@ -1778,6 +1778,34 @@ def close_trade_manual():
 
 
 
+
+# ══ WAITLIST ══
+_waitlist = []
+
+@app.route("/api/waitlist", methods=["GET","POST"])
+def waitlist():
+    global _waitlist
+    if request.method == "POST":
+        email = request.get_json().get("email","").strip()
+        if email and "@" in email and email not in _waitlist:
+            _waitlist.append(email)
+            # Guardar en archivo
+            try:
+                with open("waitlist.txt","a") as f:
+                    f.write(email+"\n")
+            except: pass
+            send_telegram(f"📧 Nueva lista de espera: {email} ({len(_waitlist)} total)")
+        return jsonify({"ok":True,"count":len(_waitlist)})
+    return jsonify({"count":len(_waitlist)})
+
+@app.route("/landing")
+def landing_page():
+    try:
+        with open("nexus_landing.html","r") as f:
+            return f.read(), 200, {"Content-Type":"text/html"}
+    except Exception as e:
+        return f"Error: {e}", 500
+
 @app.route("/track")
 def track_page():
     try:
