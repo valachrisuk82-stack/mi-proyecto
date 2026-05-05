@@ -5,7 +5,7 @@
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 import anthropic
 import requests
@@ -1779,7 +1779,11 @@ def close_trade_manual():
 
 @app.route("/stats")
 def stats_page():
-    return send_from_directory(".", "nexus_stats.html")
+    try:
+        with open("nexus_stats.html", "r") as f:
+            return f.read(), 200, {"Content-Type": "text/html"}
+    except Exception as e:
+        return f"Error: {e}", 500
 
 # ══════════════════════════════════════════════════════════════════
 #  MACRO CALENDAR + NEWS FILTER
