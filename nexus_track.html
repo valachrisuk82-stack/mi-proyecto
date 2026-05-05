@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS APEX — Track Record Público</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#02030a;color:#eef0f8;font-family:'JetBrains Mono',monospace;min-height:100vh}
+.hero{background:linear-gradient(135deg,#02030a,#060912);border-bottom:1px solid rgba(0,255,136,0.15);padding:40px 32px;text-align:center}
+.logo{font-family:'Syne',sans-serif;font-size:11px;letter-spacing:4px;color:#00ff88;margin-bottom:12px}
+h1{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:white;margin-bottom:8px}
+h1 span{color:#00ff88}
+.subtitle{color:#64748b;font-size:12px;letter-spacing:1px;margin-bottom:24px}
+.live-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);border-radius:20px;padding:6px 16px;font-size:10px;color:#00ff88;letter-spacing:2px}
+.dot{width:6px;height:6px;border-radius:50%;background:#00ff88;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.container{max-width:1200px;margin:0 auto;padding:32px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:32px}
+.kpi{background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:20px;text-align:center;transition:border-color .2s}
+.kpi:hover{border-color:rgba(0,255,136,0.2)}
+.kpi-label{font-size:8px;letter-spacing:3px;color:#475569;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-size:32px;font-weight:800;font-family:'Syne',sans-serif}
+.kpi-sub{font-size:9px;color:#475569;margin-top:4px}
+.green{color:#10b981}.yellow{color:#fbbf24}.blue{color:#3b82f6}.red{color:#ef4444}.purple{color:#a855f7}
+.charts{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:32px}
+.chart-box{background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:20px}
+.chart-title{font-size:8px;letter-spacing:2px;color:#475569;text-transform:uppercase;margin-bottom:16px}
+.trades-section{background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:20px;margin-bottom:32px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.section-title{font-size:8px;letter-spacing:2px;color:#475569;text-transform:uppercase}
+.filter-btns{display:flex;gap:6px}
+.filter-btn{padding:3px 10px;font-size:8px;border:1px solid rgba(255,255,255,0.1);border-radius:4px;background:none;color:#64748b;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:1px;transition:all .15s}
+.filter-btn.on{border-color:#00ff88;color:#00ff88;background:rgba(0,255,136,0.08)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{color:#334155;text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:7px;letter-spacing:2px}
+td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03)}
+tr:hover td{background:rgba(255,255,255,0.01)}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:1px}
+.badge.WIN{background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.3)}
+.badge.LOSS{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3)}
+.badge.OPEN{background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.3)}
+.badge.LONG{background:rgba(16,185,129,0.08);color:#10b981}
+.badge.SHORT{background:rgba(239,68,68,0.08);color:#ef4444}
+.verified{display:inline-flex;align-items:center;gap:4px;font-size:8px;color:#64748b}
+.cta{background:linear-gradient(135deg,rgba(0,255,136,0.1),rgba(0,229,255,0.05));border:1px solid rgba(0,255,136,0.2);border-radius:12px;padding:40px;text-align:center;margin-bottom:32px}
+.cta h2{font-family:'Syne',sans-serif;font-size:24px;color:white;margin-bottom:8px}
+.cta p{color:#64748b;font-size:11px;margin-bottom:24px;line-height:1.6}
+.cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-primary{padding:12px 32px;background:#00ff88;color:#02030a;font:bold 11px 'JetBrains Mono',monospace;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;text-decoration:none;display:inline-block;transition:all .2s}
+.btn-primary:hover{background:#00e57a;box-shadow:0 0 24px rgba(0,255,136,0.4)}
+.btn-secondary{padding:12px 32px;background:none;color:#00ff88;font:bold 11px 'JetBrains Mono',monospace;border:1px solid rgba(0,255,136,0.4);border-radius:6px;cursor:pointer;letter-spacing:2px;text-decoration:none;display:inline-block;transition:all .2s}
+.btn-secondary:hover{background:rgba(0,255,136,0.08)}
+.disclaimer{background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:8px;padding:16px;font-size:9px;color:#92400e;line-height:1.6;margin-bottom:32px}
+.footer{text-align:center;padding:24px;color:#1e293b;font-size:9px;letter-spacing:1px}
+.progress-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;transition:width 1s}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">⚡ NEXUS APEX</div>
+  <h1>Track Record <span>Verificado</span></h1>
+  <div class="subtitle">RESULTADOS EN TIEMPO REAL — SIN EDITAR — SIN CHERRY-PICKING</div>
+  <div class="live-badge"><div class="dot"></div> PAPER TRADING EN VIVO</div>
+</div>
+
+<div class="container">
+
+  <div class="kpis" id="kpisGrid">
+    <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val green" id="tWR">--%</div><div class="kpi-sub" id="tWRsub">calculando...</div><div class="progress-bar"><div class="progress-fill green" id="tWRbar" style="width:0%;background:#10b981"></div></div></div>
+    <div class="kpi"><div class="kpi-label">Profit Factor</div><div class="kpi-val yellow" id="tPF">--</div><div class="kpi-sub">target &gt;1.5</div></div>
+    <div class="kpi"><div class="kpi-label">Net R Total</div><div class="kpi-val blue" id="tNetR">--</div><div class="kpi-sub">en unidades R</div></div>
+    <div class="kpi"><div class="kpi-label">Max Drawdown</div><div class="kpi-val red" id="tDD">--</div><div class="kpi-sub">peor racha</div></div>
+    <div class="kpi"><div class="kpi-label">Total Trades</div><div class="kpi-val purple" id="tTotal">--</div><div class="kpi-sub" id="tDays">-- días</div></div>
+    <div class="kpi"><div class="kpi-label">Abiertas</div><div class="kpi-val yellow" id="tOpen">--</div><div class="kpi-sub">en curso</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-box">
+      <div class="chart-title">Curva de equity — R acumulado</div>
+      <canvas id="equityChart" height="100"></canvas>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Distribución resultados</div>
+      <canvas id="distChart" height="100"></canvas>
+    </div>
+  </div>
+
+  <div class="trades-section">
+    <div class="section-header">
+      <div class="section-title">Historial completo de operaciones</div>
+      <div class="filter-btns">
+        <button class="filter-btn on" onclick="filterTrades('ALL',this)">TODO</button>
+        <button class="filter-btn" onclick="filterTrades('WIN',this)">WINS</button>
+        <button class="filter-btn" onclick="filterTrades('LOSS',this)">LOSSES</button>
+        <button class="filter-btn" onclick="filterTrades('OPEN',this)">ABIERTAS</button>
+      </div>
+    </div>
+    <table>
+      <tr><th>FECHA</th><th>PAR</th><th>DIRECCIÓN</th><th>ENTRY</th><th>STOP LOSS</th><th>TAKE PROFIT</th><th>R:R</th><th>ML SCORE</th><th>RESULTADO</th><th>P&L R</th></tr>
+      <tbody id="tradesTbody"></tbody>
+    </table>
+  </div>
+
+  <div class="cta">
+    <h2>¿Quieres acceso al sistema completo?</h2>
+    <p>Este track record es 100% real y verificable. Cuando alcancemos 200 trades con WR sostenido >40%<br>abriremos acceso premium al dashboard completo con señales en tiempo real.</p>
+    <div class="cta-btns">
+      <a href="mailto:nexusapex@gmail.com?subject=Lista de espera NEXUS APEX" class="btn-primary">UNIRME A LA LISTA DE ESPERA</a>
+      <a href="/login" class="btn-secondary">YA TENGO ACCESO</a>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    ⚠️ AVISO DE RIESGO: Los resultados pasados no garantizan resultados futuros. Este es un sistema en modo paper trading (simulado). El trading de criptomonedas conlleva riesgo significativo de pérdida. No inviertas dinero que no puedas permitirte perder. NEXUS APEX es una herramienta de análisis, no un asesor financiero regulado.
+  </div>
+
+</div>
+
+<div class="footer">© 2026 NEXUS APEX — TODOS LOS DERECHOS RESERVADOS — RESULTADOS VERIFICADOS ON-CHAIN</div>
+
+<script>
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:5001/api'
+  : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+
+let allTrades = [];
+let eqChart, distChart;
+
+async function loadTrack() {
+  try {
+    const r = await fetch(`${API}/paper/stats`);
+    const d = await r.json();
+    allTrades = d.trades || [];
+    renderKPIs(d);
+    renderEquity(allTrades);
+    renderDist(d);
+    renderTrades(allTrades);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderKPIs(d) {
+  const set = (id,val,color) => {
+    const e = document.getElementById(id);
+    if(e){e.textContent=val; if(color)e.style.color=color;}
+  };
+  set('tWR',    d.wr+'%',   d.wr>=40?'#10b981':d.wr>=30?'#fbbf24':'#ef4444');
+  set('tWRsub', `${d.wins}W / ${d.losses}L`);
+  set('tPF',    d.pf||'--', d.pf>=1.5?'#10b981':d.pf>=1?'#fbbf24':'#ef4444');
+  set('tNetR',  (d.net_r>=0?'+':'')+d.net_r+'R', d.net_r>=0?'#3b82f6':'#ef4444');
+  set('tDD',    d.max_dd+'R', '#ef4444');
+  set('tTotal', d.total||0);
+  set('tDays',  `${d.days_running||0} días corriendo`);
+  set('tOpen',  d.open||0);
+  const bar = document.getElementById('tWRbar');
+  if(bar) bar.style.width = (d.wr||0)+'%';
+  // Progress hacia 200 trades
+  const pct = Math.min(100, ((d.total||0)/200)*100);
+  document.title = `NEXUS APEX — ${d.total||0} trades | WR ${d.wr||0}%`;
+}
+
+function renderEquity(trades) {
+  const closed = [...trades].filter(t=>t.outcome!=='OPEN').reverse();
+  let cum = 0;
+  const data = closed.map(t => { cum+=t.pnl_r; return parseFloat(cum.toFixed(1)); });
+  const labels = closed.map((_,i)=>`#${i+1}`);
+  const color = cum>=0?'#10b981':'#ef4444';
+  if(eqChart) eqChart.destroy();
+  eqChart = new Chart(document.getElementById('equityChart'), {
+    type:'line',
+    data:{labels,datasets:[{data,borderColor:color,backgroundColor:color.replace(')',',0.1)').replace('rgb','rgba'),fill:true,tension:0.3,pointRadius:2,borderWidth:2}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#475569',font:{size:9}}}},responsive:true,maintainAspectRatio:false}
+  });
+}
+
+function renderDist(d) {
+  if(distChart) distChart.destroy();
+  distChart = new Chart(document.getElementById('distChart'), {
+    type:'doughnut',
+    data:{
+      labels:['Wins','Losses','Open'],
+      datasets:[{data:[d.wins||0,d.losses||0,d.open||0],backgroundColor:['rgba(16,185,129,0.8)','rgba(239,68,68,0.8)','rgba(245,158,11,0.8)'],borderWidth:0}]
+    },
+    options:{plugins:{legend:{labels:{color:'#64748b',font:{size:9},padding:10}}},responsive:true,maintainAspectRatio:false}
+  });
+}
+
+function renderTrades(trades) {
+  const tb = document.getElementById('tradesTbody');
+  if(!trades.length){
+    tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:#334155">Sin operaciones registradas aún. El paper trading está corriendo...</td></tr>';
+    return;
+  }
+  tb.innerHTML = trades.map(t => {
+    const pnl = t.outcome==='OPEN'?'<span style="color:#f59e0b">--</span>':`<span style="color:${t.pnl_r>0?'#10b981':'#ef4444'}">${t.pnl_r>0?'+':''}${t.pnl_r}R</span>`;
+    return `<tr>
+      <td style="color:#475569">${t.ts?.slice(0,16)||'--'}</td>
+      <td style="font-weight:600">${t.pair?.replace('USDT','')||'--'}/USDT</td>
+      <td><span class="badge ${t.signal}">${t.signal}</span></td>
+      <td>$${t.entry?.toLocaleString()||'--'}</td>
+      <td style="color:#ef4444">$${t.sl?.toLocaleString()||'--'}</td>
+      <td style="color:#10b981">$${t.tp?.toLocaleString()||'--'}</td>
+      <td>${t.rr||'--'}</td>
+      <td>${t.ml||'--'}/100</td>
+      <td><span class="badge ${t.outcome}">${t.outcome}</span></td>
+      <td>${pnl}</td>
+    </tr>`;
+  }).join('');
+}
+
+let currentFilter = 'ALL';
+function filterTrades(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const filtered = f==='ALL' ? allTrades : allTrades.filter(t=>t.outcome===f);
+  renderTrades(filtered);
+}
+
+loadTrack();
+setInterval(loadTrack, 60000);
+</script>
+</body>
+</html>

@@ -1777,6 +1777,15 @@ def close_trade_manual():
         return jsonify({"ok": False, "error": str(e)})
 
 
+
+@app.route("/track")
+def track_page():
+    try:
+        with open("nexus_track.html","r") as f:
+            return f.read(), 200, {"Content-Type":"text/html"}
+    except Exception as e:
+        return f"Error: {e}", 500
+
 @app.route("/stats")
 def stats_page():
     try:
@@ -1854,6 +1863,138 @@ def macro_events():
     except Exception as ex:
         return jsonify({"events": [], "blackout": False, "reason": str(ex)})
 
+
+# ══════════════════════════════════════════════════════════════════
+#  PAPER TRADING ENGINE
+# ══════════════════════════════════════════════════════════════════
+PAPER_MODE = True  # Cambiar a False cuando tengas track record validado
+
+def paper_add_trade(pair, signal, entry, sl, tp, rr, conf, ml_score):
+    """Registra trade en paper trading y track record público"""
+    if not PAPER_MODE: return None
+    con = _sq.connect(JOURNAL_DB)
+    # Verificar límites paper (max 5 simultáneos en paper)
+    open_c = con.execute(
+        "SELECT COUNT(*) FROM trades WHERE outcome='OPEN' AND mode='PAPER'").fetchone()[0]
+    if open_c >= 5:
+        con.close()
+        return None
+    cur = con.execute("""INSERT INTO trades
+        (ts,pair,signal,entry,sl,tp,rr,confidence,ml_score,source,mode)
+        VALUES(?,?,?,?,?,?,?,?,?,'PAPER','PAPER')""",
+        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+         pair,signal,entry,sl,tp,rr,conf,ml_score))
+    tid = cur.lastrowid
+    # Registrar en track record público
+    con.execute("""INSERT INTO track_record
+        (ts,pair,signal,entry,sl,tp,rr,confidence,ml_score,mode)
+        VALUES(?,?,?,?,?,?,?,?,?,'PAPER')""",
+        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+         pair,signal,entry,sl,tp,rr,conf,ml_score))
+    con.commit(); con.close()
+    return tid
+
+def paper_close_trades():
+    """Cierra paper trades cuando tocan SL o TP"""
+    con = _sq.connect(JOURNAL_DB)
+    open_trades = con.execute(
+        "SELECT id,pair,signal,entry,sl,tp FROM trades WHERE outcome='OPEN' AND mode='PAPER'"
+    ).fetchall()
+    closed = 0
+    for tid, pair, signal, entry, sl, tp in open_trades:
+        try:
+            r = requests.get("https://api.binance.com/api/v3/ticker/price",
+                           params={"symbol": pair}, timeout=3)
+            price = float(r.json()["price"])
+            outcome, pnl_r = None, 0
+            if signal == "LONG":
+                if price <= sl:   outcome, pnl_r = "LOSS", -1.0
+                elif price >= tp: outcome, pnl_r = "WIN",   3.0
+            else:
+                if price >= sl:   outcome, pnl_r = "LOSS", -1.0
+                elif price <= tp: outcome, pnl_r = "WIN",   3.0
+            if outcome:
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                con.execute("""UPDATE trades SET outcome=?,pnl_r=?,closed_at=?
+                    WHERE id=?""", (outcome,pnl_r,now_str,tid))
+                # Actualizar track record
+                con.execute("""UPDATE track_record SET outcome=?,pnl_r=?,closed_at=?
+                    WHERE pair=? AND signal=? AND entry=? AND outcome='OPEN'""",
+                    (outcome,pnl_r,now_str,pair,signal,entry))
+                today = datetime.now().strftime("%Y-%m-%d")
+                col = "wins" if outcome=="WIN" else "losses"
+                con.execute(f"""INSERT INTO daily_stats(date,{col},net_r,mode)
+                    VALUES(?,1,?,'PAPER')
+                    ON CONFLICT(date) DO UPDATE SET {col}={col}+1,net_r=net_r+?""",
+                    (today,pnl_r,pnl_r))
+                closed += 1
+        except: pass
+    if closed: con.commit()
+    con.close()
+    return closed
+
+def paper_stats():
+    """Stats del paper trading para track record"""
+    con = _sq.connect(JOURNAL_DB)
+    rows = con.execute("""SELECT outcome,pnl_r,pair,signal,ts,entry,sl,tp,rr,ml_score
+        FROM track_record ORDER BY id DESC""").fetchall()
+    con.close()
+    closed = [r for r in rows if r[0] not in ('OPEN',None)]
+    wins   = sum(1 for r in closed if r[0]=='WIN')
+    losses = sum(1 for r in closed if r[0]=='LOSS')
+    total  = wins+losses
+    wr     = round(wins/total*100,1) if total else 0
+    pf     = round(wins*3/losses,2) if losses else 0
+    net_r  = round(sum(r[1] for r in closed),1)
+    # Drawdown máximo
+    cumr, peak, dd = 0, 0, 0
+    for r in reversed(closed):
+        cumr += r[1]
+        peak = max(peak, cumr)
+        dd   = min(dd, cumr - peak)
+    open_c = sum(1 for r in rows if r[0]=='OPEN')
+    days   = len(set(r[4][:10] for r in rows)) if rows else 0
+    return {
+        "wins":wins,"losses":losses,"total":total,"open":open_c,
+        "wr":wr,"pf":pf,"net_r":net_r,"max_dd":round(dd,1),
+        "days_running":days,
+        "trades": [{"outcome":r[0],"pnl_r":r[1],"pair":r[2],"signal":r[3],
+                    "ts":r[4],"entry":r[5],"sl":r[6],"tp":r[7],"rr":r[8],"ml":r[9]}
+                   for r in rows[:50]]
+    }
+
+@app.route("/api/paper/stats")
+def paper_stats_api():
+    return jsonify(paper_stats())
+
+@app.route("/api/paper/add", methods=["POST"])
+def paper_add_manual():
+    """Añadir trade manualmente al paper trading"""
+    try:
+        d = request.get_json()
+        tid = paper_add_trade(
+            d["pair"],d["signal"],float(d["entry"]),
+            float(d["sl"]),float(d["tp"]),float(d.get("rr",3)),
+            int(d.get("confidence",70)),int(d.get("ml_score",50))
+        )
+        return jsonify({"ok": tid is not None, "trade_id": tid})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)})
+
+def paper_trading_thread():
+    """Thread que verifica paper trades cada 5 minutos"""
+    import time as _t
+    _t.sleep(60)
+    while True:
+        try:
+            closed = paper_close_trades()
+            if closed:
+                stats = paper_stats()
+                print(f"  📊 Paper: {closed} trades cerrados | WR:{stats['wr']}% Net:{stats['net_r']}R")
+        except Exception as e:
+            pass
+        _t.sleep(300)
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
@@ -1874,6 +2015,7 @@ threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
+threading.Thread(target=paper_trading_thread, daemon=True).start()
 threading.Thread(target=lambda: [
     __import__("time").sleep(1800) or journal_close_open_trades()
     for _ in iter(int, 1)
