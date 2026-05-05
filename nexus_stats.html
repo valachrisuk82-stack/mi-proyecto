@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS APEX — Stats Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#02030a;color:#eef0f8;font-family:'JetBrains Mono',monospace;min-height:100vh;padding:20px}
+h1{font-family:'Syne',sans-serif;font-size:22px;color:#00ff88;letter-spacing:3px;margin-bottom:20px;text-shadow:0 0 20px rgba(0,255,136,0.4)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.card{background:#060912;border:1px solid rgba(0,255,136,0.1);border-radius:8px;padding:16px;text-align:center}
+.card-label{font-size:9px;letter-spacing:2px;color:#475569;text-transform:uppercase;margin-bottom:8px}
+.card-val{font-size:28px;font-weight:800;font-family:'Syne',sans-serif}
+.card-sub{font-size:10px;color:#64748b;margin-top:4px}
+.section{background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px;margin-bottom:16px}
+.section-title{font-size:9px;letter-spacing:2px;color:#475569;text-transform:uppercase;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{color:#475569;text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.05);letter-spacing:1px;font-size:8px}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.03)}
+.win{color:#10b981}.loss{color:#ef4444}.open{color:#f59e0b}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-box{background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px}
+.blocked{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);color:#ef4444}
+.active{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:#10b981}
+.macro-event{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:10px}
+.high{color:#ef4444}.medium{color:#f59e0b}
+</style>
+</head>
+<body>
+<h1>⚡ NEXUS APEX — STATS DASHBOARD</h1>
+
+<div class="grid" id="statsGrid">
+  <div class="card"><div class="card-label">Win Rate</div><div class="card-val" id="sWR" style="color:#10b981">--%</div><div class="card-sub" id="sWRsub">-- trades</div></div>
+  <div class="card"><div class="card-label">Profit Factor</div><div class="card-val" id="sPF" style="color:#fbbf24">--</div><div class="card-sub">target: >1.5</div></div>
+  <div class="card"><div class="card-label">Net R</div><div class="card-val" id="sNetR" style="color:#3b82f6">--</div><div class="card-sub" id="sNetRsub">total acumulado</div></div>
+  <div class="card"><div class="card-label">Abiertas</div><div class="card-val" id="sOpen" style="color:#f59e0b">--</div><div class="card-sub">max 3</div></div>
+  <div class="card"><div class="card-label">Hoy</div><div class="card-val" id="sToday" style="color:#fbbf24">--</div><div class="card-sub">stop: -3R</div></div>
+  <div class="card" id="sStatusCard"><div class="card-label">Sistema</div><div class="card-val" id="sStatus" style="font-size:16px">--</div><div class="card-sub">risk manager</div></div>
+</div>
+
+<div class="charts">
+  <div class="chart-box"><div class="section-title">Curva de equity (R acumulado)</div><canvas id="equityChart" height="120"></canvas></div>
+  <div class="chart-box"><div class="section-title">Win/Loss por par</div><canvas id="pairChart" height="120"></canvas></div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+  <div class="section">
+    <div class="section-title">Historial de operaciones</div>
+    <table>
+      <tr><th>TIEMPO</th><th>PAR</th><th>DIR</th><th>ENTRY</th><th>SL</th><th>TP</th><th>R:R</th><th>ML</th><th>RESULTADO</th><th>P&L R</th></tr>
+      <tbody id="tradesTable"></tbody>
+    </table>
+  </div>
+  <div class="section">
+    <div class="section-title">Calendario macro</div>
+    <div id="macroList"><div style="color:#475569;font-size:10px">Cargando...</div></div>
+  </div>
+</div>
+
+<script>
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5001/api'
+  : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+
+let equityChartInst, pairChartInst;
+
+async function loadAll() {
+  const [statsR, tradesR, macroR] = await Promise.all([
+    fetch(`${API}/journal/stats`).then(r=>r.json()).catch(()=>({})),
+    fetch(`${API}/journal/trades`).then(r=>r.json()).catch(()=>[]),
+    fetch(`${API}/macro_events`).then(r=>r.json()).catch(()=>({events:[],blackout:false}))
+  ]);
+  renderStats(statsR);
+  renderTrades(tradesR);
+  renderEquityChart(tradesR);
+  renderPairChart(tradesR);
+  renderMacro(macroR);
+}
+
+function renderStats(s) {
+  const set = (id, val, color) => { const e = document.getElementById(id); if(e){e.textContent=val; if(color) e.style.color=color;} };
+  set('sWR',    (s.wr||0)+'%',  s.wr>=33?'#10b981':'#ef4444');
+  set('sWRsub', `${s.wins||0}W / ${s.losses||0}L`);
+  set('sPF',    s.pf||'--',     s.pf>=1?'#fbbf24':'#ef4444');
+  set('sNetR',  (s.net_r>=0?'+':'')+s.net_r+'R', s.net_r>=0?'#3b82f6':'#ef4444');
+  set('sOpen',  (s.open_trades||0)+'/3', s.open_trades>=3?'#ef4444':'#f59e0b');
+  set('sToday', (s.today_net>=0?'+':'')+s.today_net+'R', s.today_net>=-3?'#fbbf24':'#ef4444');
+  set('sStatus', s.blocked?'🛑 BLOQUEADO':'✅ ACTIVO');
+  const card = document.getElementById('sStatusCard');
+  if(card) { card.className = 'card ' + (s.blocked?'blocked':'active'); }
+}
+
+function renderTrades(trades) {
+  const tb = document.getElementById('tradesTable');
+  if (!trades.length) { tb.innerHTML = '<tr><td colspan="10" style="color:#475569;text-align:center;padding:20px">Sin operaciones registradas</td></tr>'; return; }
+  tb.innerHTML = trades.map(t => {
+    const cls = t.outcome==='WIN'?'win':t.outcome==='LOSS'?'loss':'open';
+    const pnl = t.outcome==='OPEN'?'--':(t.pnl_r>0?'+':'')+t.pnl_r+'R';
+    return `<tr>
+      <td style="color:#64748b">${t.ts?.slice(11,16)||'--'}</td>
+      <td>${t.pair?.replace('USDT','')||'--'}</td>
+      <td class="${t.signal==='LONG'?'win':'loss'}">${t.signal}</td>
+      <td>$${t.entry?.toLocaleString()||'--'}</td>
+      <td style="color:#ef4444">$${t.sl?.toLocaleString()||'--'}</td>
+      <td style="color:#10b981">$${t.tp?.toLocaleString()||'--'}</td>
+      <td>${t.rr||'--'}</td>
+      <td>${t.ml_score||'--'}</td>
+      <td class="${cls}">${t.outcome}</td>
+      <td class="${cls}">${pnl}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderEquityChart(trades) {
+  const closed = trades.filter(t => t.outcome !== 'OPEN').reverse();
+  let cumR = 0;
+  const data = closed.map(t => { cumR += t.pnl_r; return cumR; });
+  const labels = closed.map((t,i) => `#${i+1}`);
+  if (equityChartInst) equityChartInst.destroy();
+  equityChartInst = new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data, borderColor: cumR >= 0 ? '#10b981' : '#ef4444',
+        backgroundColor: cumR >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+        fill: true, tension: 0.3, pointRadius: 3
+      }]
+    },
+    options: { plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true }
+  });
+}
+
+function renderPairChart(trades) {
+  const pairs = {};
+  trades.forEach(t => {
+    if (t.outcome === 'OPEN') return;
+    const p = t.pair?.replace('USDT','') || '?';
+    if (!pairs[p]) pairs[p] = {w:0,l:0};
+    t.outcome==='WIN' ? pairs[p].w++ : pairs[p].l++;
+  });
+  const labels = Object.keys(pairs);
+  if (pairChartInst) pairChartInst.destroy();
+  pairChartInst = new Chart(document.getElementById('pairChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {label:'Wins', data:labels.map(p=>pairs[p].w), backgroundColor:'rgba(16,185,129,0.7)'},
+        {label:'Losses', data:labels.map(p=>pairs[p].l), backgroundColor:'rgba(239,68,68,0.7)'}
+      ]
+    },
+    options: { plugins:{legend:{labels:{color:'#64748b',font:{size:9}}}}, scales:{x:{ticks:{color:'#64748b',font:{size:9}}}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true }
+  });
+}
+
+function renderMacro(macro) {
+  const list = document.getElementById('macroList');
+  if (macro.blackout) {
+    list.innerHTML = `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px;margin-bottom:8px;color:#ef4444;font-size:10px">🚨 BLACKOUT ACTIVO<br>${macro.reason}</div>`;
+  } else {
+    list.innerHTML = '';
+  }
+  if (!macro.events?.length) {
+    list.innerHTML += '<div style="color:#475569;font-size:10px">Sin eventos próximos</div>';
+    return;
+  }
+  list.innerHTML += macro.events.map(e => `
+    <div class="macro-event">
+      <div>
+        <span class="${e.impact==='High'?'high':'medium'}">${e.impact==='High'?'🔴':'🟡'} </span>
+        <span style="font-size:9px">${e.title}</span>
+      </div>
+      <div style="color:#64748b;font-size:9px">${e.time} (${e.minutes_away>0?'+':''}${e.minutes_away}m)</div>
+    </div>`).join('');
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>

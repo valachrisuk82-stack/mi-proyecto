@@ -350,6 +350,8 @@ canvas{position:absolute;top:0;left:0}
     <button onclick="SMC.enabled.ob=!SMC.enabled.ob;this.style.opacity=SMC.enabled.ob?1:0.35;drawCandles(S.candles)" style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.6);color:#10b981;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">OB</button>
     <button onclick="SMC.enabled.fvg=!SMC.enabled.fvg;this.style.opacity=SMC.enabled.fvg?1:0.35;drawCandles(S.candles)" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.6);color:#fbbf24;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">FVG</button>
     <button onclick="SMC.enabled.bos=!SMC.enabled.bos;this.style.opacity=SMC.enabled.bos?1:0.35;drawCandles(S.candles)" style="background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.6);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">BOS</button>
+    <button onclick="S.showSessions=!S.showSessions;this.style.opacity=S.showSessions?1:0.35;drawCandles(S.candles)" style="background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.6);color:#3b82f6;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">SES</button>
+    <button onclick="S.showLiquidity=!S.showLiquidity;this.style.opacity=S.showLiquidity?1:0.35;drawCandles(S.candles)" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.6);color:#fbbf24;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">LIQ</button>
   </div>
       <canvas id="overlayCanvas" style="pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
@@ -541,7 +543,7 @@ const CAT_ICONS = {
 const S = {
   pair: "BTCUSDT", tf: "1m",
   tickers: {}, inds: {}, sigs: {}, srData: {},
-  candles: [], serverOk: false,
+  candles: [], serverOk: false, showSessions: true, showLiquidity: true,
   slP: null, tpP: null, trailP: null,
   mlScores: {}, filter: "ALL", category: "ALL",
 };
@@ -870,6 +872,13 @@ function redrawDrawings(preview) {
   ctx.restore();
 }
 
+function drawSessionsAndLiquidity(candles, ctx, W, H, pad, lo, hi, cH, toY) {
+  ctx.save();
+  drawSessionOverlay(candles, ctx, W, H, pad, lo, hi, cH, toY);
+  drawLiquidityHeatmap(candles, ctx, W, H, pad, lo, hi, cH, toY);
+  ctx.restore();
+}
+
 function initCrosshair() {
   const wrap = document.getElementById("chartWrap");
   const ch = document.getElementById("crosshairCanvas");
@@ -1066,6 +1075,8 @@ function drawCandles(candles) {
 
   detectSMC(candles);
   checkSMCSignal(candles);
+  drawSessionsAndLiquidity(candles,cv.getContext("2d"),W,H,pad,lo,hi,cH,toY);
+  drawSessionsAndLiquidity(candles, cv.getContext("2d"), W, H, pad, lo, hi, cH, toY);
   const smcCtx=cv.getContext("2d");
   drawSMC(candles,smcCtx,W,H,pad,lo,hi,cH,toY);
   drawLevels(ov,W,H,pad,lo,hi,cH,toY);
@@ -1089,6 +1100,85 @@ function drawLevels(ov,W,H,pad,lo,hi,cH,toY){
 // ══════════════════════════════════════════
 // SMC — Smart Money Concepts Engine
 // ══════════════════════════════════════════
+
+
+// ══════════════════════════════════════════════════════════════════
+// SESSION OVERLAY + LIQUIDITY HEATMAP
+// ══════════════════════════════════════════════════════════════════
+const SESSIONS = {
+  asia:   { start:0,  end:9,  color:'rgba(168,85,247,0.05)',  label:'ASIA',   border:'rgba(168,85,247,0.4)' },
+  london: { start:8,  end:17, color:'rgba(59,130,246,0.05)', label:'LONDON', border:'rgba(59,130,246,0.4)' },
+  ny:     { start:13, end:22, color:'rgba(251,191,36,0.04)', label:'NY',     border:'rgba(251,191,36,0.4)' },
+};
+
+function drawSessionOverlay(candles, ctx, W, H, pad, lo, hi, cH, toY) {
+  if (!candles || !S.showSessions) return;
+  const n=candles.length, cW=W-pad.left-pad.right, gap=cW/n;
+  candles.forEach((c,i) => {
+    const t=c.time?new Date(c.time):null; if(!t)return;
+    const h=t.getUTCHours(), x=pad.left+i*gap;
+    Object.values(SESSIONS).forEach(sess => {
+      const inSess=sess.start<=sess.end?h>=sess.start&&h<sess.end:h>=sess.start||h<sess.end;
+      if(!inSess)return;
+      ctx.fillStyle=sess.color; ctx.fillRect(x,pad.top,gap,cH);
+    });
+  });
+  ctx.font='bold 7px JetBrains Mono,monospace';
+  Object.values(SESSIONS).forEach(sess => {
+    for(let i=0;i<n;i++){
+      const t=candles[i].time?new Date(candles[i].time):null; if(!t)continue;
+      if(t.getUTCHours()===sess.start){
+        const x=pad.left+i*(cW/n);
+        ctx.fillStyle=sess.border; ctx.fillRect(x,pad.top,1,cH);
+        ctx.fillStyle=sess.border.replace('0.4)','0.9)');
+        ctx.fillText(sess.label,x+3,pad.top+10); break;
+      }
+    }
+  });
+}
+
+function drawLiquidityHeatmap(candles, ctx, W, H, pad, lo, hi, cH, toY) {
+  if (!candles||candles.length<10||!S.showLiquidity) return;
+  const n=candles.length, cW=W-pad.left-pad.right, gap=cW/n;
+  const swing=3, highs=[], lows=[];
+  for(let i=swing;i<n-swing;i++){
+    if([...Array(swing)].every((_,k)=>candles[i].high>candles[i-k-1].high&&candles[i].high>candles[i+k+1].high))
+      highs.push({price:candles[i].high,idx:i});
+    if([...Array(swing)].every((_,k)=>candles[i].low<candles[i-k-1].low&&candles[i].low<candles[i+k+1].low))
+      lows.push({price:candles[i].low,idx:i});
+  }
+  const cluster=levels=>{
+    const g=[];
+    levels.forEach(l=>{const f=g.find(x=>Math.abs(x.price-l.price)/l.price<0.001);
+      f?(f.count++,f.price=(f.price+l.price)/2):g.push({price:l.price,count:1});});
+    return g;
+  };
+  cluster(highs).forEach(g=>{
+    if(g.price<lo||g.price>hi)return;
+    const y=toY(g.price), a=Math.min(0.8,0.3+g.count*0.15);
+    ctx.strokeStyle=`rgba(244,63,94,${a})`;ctx.lineWidth=1;ctx.setLineDash([2,6]);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle=`rgba(244,63,94,${a})`;
+    ctx.font='bold 6px JetBrains Mono,monospace';
+    ctx.fillText('BSL'+(g.count>1?' 🔥':''),W-pad.right-32,y-2);
+  });
+  cluster(lows).forEach(g=>{
+    if(g.price<lo||g.price>hi)return;
+    const y=toY(g.price), a=Math.min(0.8,0.3+g.count*0.15);
+    ctx.strokeStyle=`rgba(16,185,129,${a})`;ctx.lineWidth=1;ctx.setLineDash([2,6]);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle=`rgba(16,185,129,${a})`;
+    ctx.font='bold 6px JetBrains Mono,monospace';
+    ctx.fillText('SSL'+(g.count>1?' 🔥':''),W-pad.right-32,y+8);
+  });
+}
+
+function drawSessionsAndLiquidity(candles,ctx,W,H,pad,lo,hi,cH,toY){
+  ctx.save();
+  drawSessionOverlay(candles,ctx,W,H,pad,lo,hi,cH,toY);
+  drawLiquidityHeatmap(candles,ctx,W,H,pad,lo,hi,cH,toY);
+  ctx.restore();
+}
 
 const SMC = {
   enabled: { ob: true, fvg: true, bos: true },

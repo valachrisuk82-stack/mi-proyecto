@@ -62,6 +62,8 @@ def send_telegram(message):
     except: pass
 
 
+
+
 # ══════════════════════════════════════════════════════════════════
 #  JOURNAL + RISK MANAGER
 # ══════════════════════════════════════════════════════════════════
@@ -1589,6 +1591,11 @@ def smc_signal():
             f"⚡ NEXUS APEX — Smart Money"
         )
 
+        # Filtro noticias macro
+        blackout, blackout_reason = is_news_blackout(pair)
+        if blackout:
+            return jsonify({"ok": False, "blocked": True, "reason": f"🗞️ BLACKOUT: {blackout_reason}"})
+
         # Confirmación triple: ML Score
         ml_score = int(data.get("ml_score", 0))
         mtf_ok   = bool(data.get("mtf_ok", False))
@@ -1768,6 +1775,80 @@ def close_trade_manual():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
+
+
+@app.route("/stats")
+def stats_page():
+    return send_from_directory(".", "nexus_stats.html")
+
+# ══════════════════════════════════════════════════════════════════
+#  MACRO CALENDAR + NEWS FILTER
+# ══════════════════════════════════════════════════════════════════
+_macro_events = []
+_macro_last_fetch = 0
+
+def fetch_macro_calendar():
+    """Obtiene eventos macro de ForexFactory RSS"""
+    global _macro_events, _macro_last_fetch
+    now = datetime.now().timestamp()
+    if now - _macro_last_fetch < 3600: return _macro_events
+    try:
+        import xml.etree.ElementTree as ET
+        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=5)
+        events = r.json()
+        _macro_events = []
+        for e in events:
+            if e.get("impact") in ("High","Medium"):
+                try:
+                    dt_str = e.get("date","") + " " + e.get("time","")
+                    dt = datetime.strptime(dt_str.strip(), "%Y-%m-%d %I:%M%p")
+                    _macro_events.append({
+                        "title": e.get("title",""),
+                        "impact": e.get("impact",""),
+                        "currency": e.get("country",""),
+                        "dt": dt
+                    })
+                except: pass
+        _macro_last_fetch = now
+    except:
+        _macro_events = []
+    return _macro_events
+
+def is_news_blackout(pair="BTCUSDT", window_min=30):
+    """Retorna True si hay evento macro de alto impacto en los próximos/últimos 30 min"""
+    try:
+        events = fetch_macro_calendar()
+        now = datetime.now()
+        for e in events:
+            diff = abs((e["dt"] - now).total_seconds() / 60)
+            if diff <= window_min:
+                if e["impact"] == "High":
+                    return True, f"{e['title']} ({e['impact']}) en {int(diff)}min"
+        return False, ""
+    except:
+        return False, ""
+
+@app.route("/api/macro_events")
+def macro_events():
+    try:
+        events = fetch_macro_calendar()
+        now = datetime.now()
+        result = []
+        for e in events:
+            diff = (e["dt"] - now).total_seconds() / 60
+            if -60 <= diff <= 240:
+                result.append({
+                    "title": e["title"],
+                    "impact": e["impact"],
+                    "currency": e["currency"],
+                    "minutes_away": round(diff),
+                    "time": e["dt"].strftime("%H:%M")
+                })
+        result.sort(key=lambda x: x["minutes_away"])
+        blackout, reason = is_news_blackout()
+        return jsonify({"events": result[:8], "blackout": blackout, "reason": reason})
+    except Exception as ex:
+        return jsonify({"events": [], "blackout": False, "reason": str(ex)})
 
 @app.route("/api/categories")
 def categories():
