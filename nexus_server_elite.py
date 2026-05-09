@@ -2243,6 +2243,35 @@ def paper_trading_thread():
         _t.sleep(300)
 
 
+
+@app.route("/admin")
+def admin_page():
+    try:
+        with open("nexus_admin.html","r") as f:
+            return f.read(), 200, {"Content-Type":"text/html"}
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@app.route("/api/admin/upgrade", methods=["POST"])
+def admin_upgrade():
+    try:
+        d    = request.get_json()
+        uid  = d.get("user_id")
+        plan = d.get("plan")
+        if plan not in ("free","pro","elite"):
+            return jsonify({"ok":False,"error":"Plan inválido"})
+        conn = sqlite3.connect("nexus_users.db")
+        conn.execute("UPDATE users SET plan=? WHERE id=?", (plan, uid))
+        conn.commit()
+        # Notificar por Telegram
+        user = conn.execute("SELECT username,email FROM users WHERE id=?", (uid,)).fetchone()
+        conn.close()
+        if user:
+            send_telegram(f"💎 <b>UPGRADE</b>\nUsuario: {user[0]}\nEmail: {user[1]}\nNuevo plan: <b>{plan.upper()}</b>")
+        return jsonify({"ok":True})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)})
+
 @app.route("/api/admin/users")
 def admin_users():
     try:

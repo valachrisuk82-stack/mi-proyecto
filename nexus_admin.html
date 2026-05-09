@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS APEX — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#02030a;color:#eef0f8;font-family:'JetBrains Mono',monospace;padding:24px}
+h1{font-family:'Syne',sans-serif;font-size:20px;color:#00ff88;letter-spacing:3px;margin-bottom:24px}
+.kpis{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.kpi{background:#060912;border:1px solid rgba(0,255,136,0.1);border-radius:8px;padding:16px 24px;text-align:center;min-width:140px}
+.kpi-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#00ff88}
+.kpi-label{font-size:8px;letter-spacing:2px;color:#475569;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.search{padding:8px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:white;font:11px 'JetBrains Mono',monospace;outline:none;width:220px}
+.search::placeholder{color:#334155}
+.btn{padding:8px 16px;font:bold 9px 'JetBrains Mono',monospace;border-radius:5px;cursor:pointer;letter-spacing:1px;border:none;transition:all .2s}
+.btn-green{background:#00ff88;color:#02030a}
+.btn-outline{background:none;border:1px solid rgba(255,255,255,0.1);color:#64748b}
+.btn-outline:hover{border-color:rgba(0,255,136,0.4);color:#00ff88}
+.plan-filter{display:flex;gap:4px}
+.pf{padding:6px 12px;font:bold 8px 'JetBrains Mono',monospace;border-radius:4px;cursor:pointer;border:1px solid rgba(255,255,255,0.08);background:none;color:#475569;letter-spacing:1px}
+.pf.on{border-color:#00ff88;color:#00ff88;background:rgba(0,255,136,0.08)}
+table{width:100%;border-collapse:collapse;font-size:10px;background:#060912;border-radius:10px;overflow:hidden}
+th{color:#334155;text-align:left;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:7px;letter-spacing:2px;background:#02030a}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03)}
+tr:hover td{background:rgba(255,255,255,0.01)}
+.badge{padding:2px 8px;border-radius:3px;font-size:7px;font-weight:700;letter-spacing:1px}
+.badge.free{background:rgba(100,116,139,0.15);color:#64748b;border:1px solid rgba(100,116,139,0.2)}
+.badge.pro{background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid rgba(0,255,136,0.3)}
+.badge.elite{background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)}
+.upgrade-btn{padding:2px 8px;font:bold 7px 'JetBrains Mono',monospace;border-radius:3px;cursor:pointer;border:1px solid rgba(0,255,136,0.3);background:none;color:#00ff88;transition:all .2s}
+.upgrade-btn:hover{background:rgba(0,255,136,0.1)}
+.empty{text-align:center;padding:40px;color:#334155;font-size:11px}
+</style>
+</head>
+<body>
+<h1>⚡ NEXUS APEX — ADMIN PANEL</h1>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val" id="kTotal">0</div><div class="kpi-label">TOTAL USUARIOS</div></div>
+  <div class="kpi"><div class="kpi-val" id="kFree" style="color:#64748b">0</div><div class="kpi-label">FREE</div></div>
+  <div class="kpi"><div class="kpi-val" id="kPro" style="color:#00ff88">0</div><div class="kpi-label">PRO</div></div>
+  <div class="kpi"><div class="kpi-val" id="kElite" style="color:#fbbf24">0</div><div class="kpi-label">ELITE</div></div>
+  <div class="kpi"><div class="kpi-val" id="kToday" style="color:#3b82f6">0</div><div class="kpi-label">HOY</div></div>
+</div>
+
+<div class="toolbar">
+  <input type="text" class="search" id="searchInput" placeholder="Buscar usuario, email, país..." oninput="filterTable()">
+  <div class="plan-filter">
+    <button class="pf on" onclick="setPlan('ALL',this)">TODOS</button>
+    <button class="pf" onclick="setPlan('free',this)">FREE</button>
+    <button class="pf" onclick="setPlan('pro',this)">PRO</button>
+    <button class="pf" onclick="setPlan('elite',this)">ELITE</button>
+  </div>
+  <button class="btn btn-green" onclick="exportCSV()">⬇ EXPORTAR CSV</button>
+  <button class="btn btn-outline" onclick="loadUsers()">↻ ACTUALIZAR</button>
+</div>
+
+<table>
+  <tr>
+    <th>ID</th><th>USUARIO</th><th>EMAIL</th><th>TELÉFONO</th>
+    <th>PAÍS</th><th>PLAN</th><th>REGISTRO</th><th>ACCIÓN</th>
+  </tr>
+  <tbody id="usersTable"></tbody>
+</table>
+
+<script>
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:5001/api' : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+
+let allUsers = [];
+let currentPlan = 'ALL';
+
+async function loadUsers() {
+  try {
+    const r = await fetch(`${API}/admin/users`);
+    const d = await r.json();
+    allUsers = d.users || [];
+    updateKPIs(allUsers);
+    renderTable(allUsers);
+  } catch(e) {
+    document.getElementById('usersTable').innerHTML =
+      '<tr><td colspan="8" class="empty">❌ Error conectando al servidor</td></tr>';
+  }
+}
+
+function updateKPIs(users) {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('kTotal').textContent  = users.length;
+  document.getElementById('kFree').textContent   = users.filter(u=>u.plan==='free').length;
+  document.getElementById('kPro').textContent    = users.filter(u=>u.plan==='pro').length;
+  document.getElementById('kElite').textContent  = users.filter(u=>u.plan==='elite').length;
+  document.getElementById('kToday').textContent  = users.filter(u=>u.created_at?.startsWith(today)).length;
+}
+
+function renderTable(users) {
+  const tb = document.getElementById('usersTable');
+  if (!users.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="empty">Sin usuarios registrados aún</td></tr>';
+    return;
+  }
+  tb.innerHTML = users.map(u => `<tr>
+    <td style="color:#475569">#${u.id}</td>
+    <td style="font-weight:600">${u.username}</td>
+    <td style="color:#94a3b8">${u.email}</td>
+    <td style="color:#64748b">${u.phone||'—'}</td>
+    <td>${u.country||'—'}</td>
+    <td><span class="badge ${u.plan}">${u.plan.toUpperCase()}</span></td>
+    <td style="color:#475569">${u.created_at?.slice(0,16)||'—'}</td>
+    <td>
+      ${u.plan==='free'?`<button class="upgrade-btn" onclick="upgradePlan(${u.id},'pro')">→ PRO</button>`:''}
+      ${u.plan==='pro'?`<button class="upgrade-btn" onclick="upgradePlan(${u.id},'elite')" style="color:#fbbf24;border-color:rgba(251,191,36,0.3)">→ ELITE</button>`:''}
+    </td>
+  </tr>`).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = allUsers.filter(u => {
+    const matchPlan = currentPlan==='ALL' || u.plan===currentPlan;
+    const matchQ = !q || u.username?.toLowerCase().includes(q) ||
+                   u.email?.toLowerCase().includes(q) ||
+                   u.country?.toLowerCase().includes(q) ||
+                   u.phone?.includes(q);
+    return matchPlan && matchQ;
+  });
+  renderTable(filtered);
+}
+
+function setPlan(plan, btn) {
+  currentPlan = plan;
+  document.querySelectorAll('.pf').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  filterTable();
+}
+
+async function upgradePlan(userId, plan) {
+  if (!confirm(`¿Cambiar usuario #${userId} a plan ${plan.toUpperCase()}?`)) return;
+  try {
+    const r = await fetch(`${API}/admin/upgrade`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id: userId, plan})
+    });
+    const d = await r.json();
+    if (d.ok) { loadUsers(); }
+    else alert('Error: ' + d.error);
+  } catch(e) { alert('Error de conexión'); }
+}
+
+function exportCSV() {
+  const headers = ['ID','Usuario','Email','Teléfono','País','Plan','Registro'];
+  const rows = allUsers.map(u => [
+    u.id, u.username, u.email, u.phone||'', u.country||'', u.plan, u.created_at||''
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nexus_users_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+loadUsers();
+setInterval(loadUsers, 30000);
+</script>
+</body>
+</html>
