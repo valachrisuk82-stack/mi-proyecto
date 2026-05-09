@@ -42,8 +42,8 @@ td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.03)}
 </div>
 
 <div class="charts">
-  <div class="chart-box"><div class="section-title">Curva de equity (R acumulado)</div><canvas id="equityChart" height="120"></canvas></div>
-  <div class="chart-box"><div class="section-title">Win/Loss por par</div><canvas id="pairChart" height="120"></canvas></div>
+  <div class="chart-box"><div class="section-title">Curva de equity (R acumulado)</div><canvas id="equityChart" style="max-height:150px"></canvas></div>
+  <div class="chart-box"><div class="section-title">Win/Loss por par</div><canvas id="pairChart" style="max-height:150px"></canvas></div>
 </div>
 
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
@@ -130,7 +130,7 @@ function renderEquityChart(trades) {
         fill: true, tension: 0.3, pointRadius: 3
       }]
     },
-    options: { plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true }
+    options: { plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true, maintainAspectRatio:true, aspectRatio:3 }
   });
 }
 
@@ -153,7 +153,7 @@ function renderPairChart(trades) {
         {label:'Losses', data:labels.map(p=>pairs[p].l), backgroundColor:'rgba(239,68,68,0.7)'}
       ]
     },
-    options: { plugins:{legend:{labels:{color:'#64748b',font:{size:9}}}}, scales:{x:{ticks:{color:'#64748b',font:{size:9}}}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true }
+    options: { plugins:{legend:{labels:{color:'#64748b',font:{size:9}}}}, scales:{x:{ticks:{color:'#64748b',font:{size:9}}}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:9}}}}, responsive:true, maintainAspectRatio:true, aspectRatio:2.5 }
   });
 }
 

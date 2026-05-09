@@ -82,11 +82,11 @@ tr:hover td{background:rgba(255,255,255,0.01)}
   <div class="charts">
     <div class="chart-box">
       <div class="chart-title">Curva de equity — R acumulado</div>
-      <canvas id="equityChart" height="100"></canvas>
+      <canvas id="equityChart" style="max-height:180px"></canvas>
     </div>
     <div class="chart-box">
       <div class="chart-title">Distribución resultados</div>
-      <canvas id="distChart" height="100"></canvas>
+      <canvas id="distChart" style="max-height:180px"></canvas>
     </div>
   </div>
 
@@ -175,7 +175,7 @@ function renderEquity(trades) {
   eqChart = new Chart(document.getElementById('equityChart'), {
     type:'line',
     data:{labels,datasets:[{data,borderColor:color,backgroundColor:color.replace(')',',0.1)').replace('rgb','rgba'),fill:true,tension:0.3,pointRadius:2,borderWidth:2}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#475569',font:{size:9}}}},responsive:true,maintainAspectRatio:false}
+    options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#475569',font:{size:9}}}},responsive:true,maintainAspectRatio:true,aspectRatio:3}
   });
 }
 
@@ -187,7 +187,7 @@ function renderDist(d) {
       labels:['Wins','Losses','Open'],
       datasets:[{data:[d.wins||0,d.losses||0,d.open||0],backgroundColor:['rgba(16,185,129,0.8)','rgba(239,68,68,0.8)','rgba(245,158,11,0.8)'],borderWidth:0}]
     },
-    options:{plugins:{legend:{labels:{color:'#64748b',font:{size:9},padding:10}}},responsive:true,maintainAspectRatio:false}
+    options:{plugins:{legend:{labels:{color:'#64748b',font:{size:9},padding:10}}},responsive:true,maintainAspectRatio:true,aspectRatio:1.5}
   });
 }
 
