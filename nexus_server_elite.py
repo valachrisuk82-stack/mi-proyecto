@@ -1892,6 +1892,7 @@ def macro_events():
         return jsonify({"events": [], "blackout": False, "reason": str(ex)})
 
 
+
 # ══════════════════════════════════════════════════════════════════
 #  PAPER TRADING ENGINE
 # ══════════════════════════════════════════════════════════════════
@@ -2044,6 +2045,7 @@ threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
 threading.Thread(target=paper_trading_thread, daemon=True).start()
+
 threading.Thread(target=lambda: [
     __import__("time").sleep(1800) or journal_close_open_trades()
     for _ in iter(int, 1)
