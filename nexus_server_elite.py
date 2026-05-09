@@ -1287,7 +1287,7 @@ def register():
         if len(password)<6: return jsonify({"ok":False,"error":"Password minimo 6 caracteres"}),400
         conn = sqlite3.connect("nexus_users.db")
         c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', phone TEXT, country TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         c.execute("SELECT id FROM users WHERE username=? OR email=?", (username, email))
         if c.fetchone():
             conn.close()
@@ -1295,7 +1295,9 @@ def register():
         import hashlib, json, base64
         from datetime import timedelta
         pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
-        c.execute("INSERT INTO users (username,email,password_hash,plan) VALUES (?,?,?,?)",(username,email,pw_hash,"free"))
+        phone   = data.get("phone","").strip()
+        country = data.get("country","").strip()
+        c.execute("INSERT INTO users (username,email,password_hash,plan,phone,country) VALUES (?,?,?,?,?,?)",(username,email,pw_hash,"free",phone,country))
         uid = c.lastrowid
         conn.commit(); conn.close()
         payload = json.dumps({"user_id":uid,"plan":"free","exp":(datetime.now()+timedelta(days=30)).isoformat()})
@@ -1315,7 +1317,7 @@ def login():
         from datetime import timedelta
         conn = sqlite3.connect("nexus_users.db")
         c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT UNIQUE, password_hash TEXT, plan TEXT DEFAULT 'free', phone TEXT, country TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         pw_hash = hashlib.sha256(f"nexus_salt_{password}".encode()).hexdigest()
         c.execute("SELECT id,username,email,plan FROM users WHERE (username=? OR email=?) AND password_hash=?",(username,username,pw_hash))
         user = c.fetchone(); conn.close()
@@ -2239,6 +2241,20 @@ def paper_trading_thread():
         except Exception as e:
             pass
         _t.sleep(300)
+
+
+@app.route("/api/admin/users")
+def admin_users():
+    try:
+        conn = sqlite3.connect("nexus_users.db")
+        c = conn.cursor()
+        c.execute("SELECT id,username,email,plan,phone,country,created_at FROM users ORDER BY id DESC")
+        users = [{"id":r[0],"username":r[1],"email":r[2],"plan":r[3],
+                  "phone":r[4],"country":r[5],"created_at":r[6]} for r in c.fetchall()]
+        conn.close()
+        return jsonify({"total":len(users),"users":users})
+    except Exception as e:
+        return jsonify({"error":str(e)})
 
 @app.route("/api/categories")
 def categories():
