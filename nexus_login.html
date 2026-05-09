@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS APEX — Acceder</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#02030a;color:#eef0f8;font-family:'JetBrains Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.bg{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,0.06),transparent 70%);pointer-events:none}
+.card{background:#060912;border:1px solid rgba(0,255,136,0.15);border-radius:16px;padding:40px;width:100%;max-width:420px;box-shadow:0 0 60px rgba(0,0,0,0.6)}
+.logo{text-align:center;margin-bottom:32px}
+.logo-icon{font-size:32px;margin-bottom:8px}
+.logo-text{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#00ff88;letter-spacing:3px}
+.logo-sub{font-size:9px;color:#475569;letter-spacing:2px;margin-top:4px}
+.tabs{display:flex;background:#02030a;border-radius:8px;padding:3px;margin-bottom:28px;border:1px solid rgba(255,255,255,0.06)}
+.tab{flex:1;padding:8px;text-align:center;font:bold 10px 'JetBrains Mono',monospace;letter-spacing:2px;cursor:pointer;border-radius:6px;transition:all .2s;color:#475569;border:none;background:none}
+.tab.on{background:#00ff88;color:#02030a}
+.form-group{margin-bottom:16px}
+.form-label{font-size:8px;letter-spacing:2px;color:#475569;text-transform:uppercase;margin-bottom:6px;display:block}
+.form-input{width:100%;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#eef0f8;font:12px 'JetBrains Mono',monospace;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:rgba(0,255,136,0.4);background:rgba(0,255,136,0.02)}
+.form-input::placeholder{color:#334155}
+.btn{width:100%;padding:14px;background:#00ff88;color:#02030a;font:bold 11px 'JetBrains Mono',monospace;border:none;border-radius:8px;cursor:pointer;letter-spacing:2px;transition:all .2s;margin-top:8px}
+.btn:hover{box-shadow:0 0 24px rgba(0,255,136,0.4);transform:translateY(-1px)}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.error{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:10px 14px;font-size:10px;color:#ef4444;margin-top:12px;display:none}
+.success{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:10px 14px;font-size:10px;color:#10b981;margin-top:12px;display:none}
+.divider{text-align:center;color:#334155;font-size:9px;letter-spacing:2px;margin:20px 0;position:relative}
+.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,0.05)}
+.divider span{background:#060912;padding:0 12px;position:relative}
+.footer-links{text-align:center;margin-top:20px;font-size:9px;color:#334155}
+.footer-links a{color:#475569;text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:#00ff88}
+.plan-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:7px;font-weight:700;letter-spacing:1px;background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid rgba(0,255,136,0.3);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">NEXUS APEX</div>
+    <div class="logo-sub">DASHBOARD DE TRADING PROFESIONAL</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="showTab('login',this)">ENTRAR</button>
+    <button class="tab" onclick="showTab('register',this)">REGISTRARSE</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginForm">
+    <div class="form-group">
+      <label class="form-label">Usuario o Email</label>
+      <input type="text" class="form-input" id="loginUser" placeholder="tu@email.com" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contraseña</label>
+      <input type="password" class="form-input" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn" onclick="doLogin()" id="loginBtn">ENTRAR →</button>
+    <div class="error" id="loginError"></div>
+    <div class="success" id="loginSuccess"></div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="registerForm" style="display:none">
+    <div class="form-group">
+      <label class="form-label">Usuario</label>
+      <input type="text" class="form-input" id="regUser" placeholder="mi_usuario" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="regEmail" placeholder="tu@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contraseña</label>
+      <input type="password" class="form-input" id="regPass" placeholder="Mínimo 6 caracteres" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()">
+    </div>
+    <button class="btn" onclick="doRegister()" id="registerBtn">CREAR CUENTA →</button>
+    <div class="error" id="registerError"></div>
+    <div class="success" id="registerSuccess"></div>
+  </div>
+
+  <div class="divider"><span>o</span></div>
+
+  <div class="footer-links">
+    <a href="/track">Ver track record público</a> · 
+    <a href="/landing">Planes y precios</a>
+  </div>
+</div>
+
+<script>
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:5001' : 'https://mi-proyecto-production-29a8.up.railway.app';
+
+function showTab(tab, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('loginForm').style.display    = tab==='login'    ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab==='register' ? 'block' : 'none';
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 5000);
+}
+
+function showSuccess(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function doLogin() {
+  const btn  = document.getElementById('loginBtn');
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if (!user || !pass) return showError('loginError', '❌ Completa todos los campos');
+  btn.disabled = true; btn.textContent = 'ENTRANDO...';
+  try {
+    const r = await fetch(`${API}/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, password: pass})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      localStorage.setItem('nexus_token', d.token);
+      localStorage.setItem('nexus_user', JSON.stringify(d.user));
+      showSuccess('loginSuccess', `✅ Bienvenido ${d.user.username}! Redirigiendo...`);
+      setTimeout(() => window.location.href = '/', 1000);
+    } else {
+      showError('loginError', '❌ ' + d.error);
+      btn.disabled = false; btn.textContent = 'ENTRAR →';
+    }
+  } catch(e) {
+    showError('loginError', '❌ Error de conexión');
+    btn.disabled = false; btn.textContent = 'ENTRAR →';
+  }
+}
+
+async function doRegister() {
+  const btn  = document.getElementById('registerBtn');
+  const user = document.getElementById('regUser').value.trim();
+  const email= document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  if (!user || !email || !pass) return showError('registerError', '❌ Completa todos los campos');
+  if (pass.length < 6) return showError('registerError', '❌ Contraseña mínimo 6 caracteres');
+  btn.disabled = true; btn.textContent = 'CREANDO CUENTA...';
+  try {
+    const r = await fetch(`${API}/auth/register`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, email, password: pass})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      localStorage.setItem('nexus_token', d.token);
+      localStorage.setItem('nexus_user', JSON.stringify(d.user));
+      showSuccess('registerSuccess', `✅ Cuenta creada! Bienvenido ${d.user.username}!`);
+      setTimeout(() => window.location.href = '/', 1500);
+    } else {
+      showError('registerError', '❌ ' + d.error);
+      btn.disabled = false; btn.textContent = 'CREAR CUENTA →';
+    }
+  } catch(e) {
+    showError('registerError', '❌ Error de conexión');
+    btn.disabled = false; btn.textContent = 'CREAR CUENTA →';
+  }
+}
+
+// Si ya tiene token válido, redirigir directo
+const token = localStorage.getItem('nexus_token');
+if (token) window.location.href = '/';
+</script>
+</body>
+</html>
