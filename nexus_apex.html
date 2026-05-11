@@ -263,6 +263,10 @@ canvas{position:absolute;top:0;left:0}
     <div class="pill pill-fgi" id="fgiPill">F&G --</div>
     <div class="pill pill-tg" id="tgPill">📱 TG</div>
     <div class="pill pill-live"><div class="pill-dot"></div><span id="liveText">Conectando</span></div>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:4px">
+      <span style="font-size:9px;color:#475569;letter-spacing:1px" id="userDisplay">--</span>
+      <button onclick="logout()" style="padding:3px 10px;font:bold 8px JetBrains Mono,monospace;border:1px solid rgba(255,0,85,0.3);border-radius:4px;background:none;color:#ff0055;cursor:pointer;letter-spacing:1px">SALIR</button>
+    </div>
     <div class="clock-el" id="clockEl">🇬🇧 --:--:--</div>
   </div>
 </div>
@@ -508,6 +512,34 @@ canvas{position:absolute;top:0;left:0}
 
 
 <script>
+
+// ── AUTH PROTECTION ──
+(function() {
+  const token = localStorage.getItem('nexus_token');
+  const user  = localStorage.getItem('nexus_user');
+  if (!token || !user) {
+    window.location.href = '/login';
+    return;
+  }
+  try {
+    const u = JSON.parse(user);
+    // Mostrar nombre de usuario
+    const nameEl = document.getElementById('userDisplay');
+    if (nameEl) nameEl.textContent = u.username?.toUpperCase() || 'USER';
+    // Verificar plan
+    window._nexusUser = u;
+    window._nexusPlan = u.plan || 'free';
+  } catch(e) {
+    localStorage.clear();
+    window.location.href = '/login';
+  }
+})();
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login';
+}
+
 const RAILWAY_URL = "https://mi-proyecto-production-29a8.up.railway.app/api";
 const API = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
   ? 'http://localhost:5001/api'

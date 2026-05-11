@@ -190,6 +190,30 @@ def journal_recent(limit=20):
 
 journal_init()
 
+
+def verify_token(token):
+    """Verifica un JWT token y retorna el user_id si es válido"""
+    try:
+        import base64, hashlib, json
+        parts = token.split(".")
+        if len(parts) != 2: return None
+        p64, sig = parts
+        expected = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
+        if sig != expected: return None
+        payload = json.loads(base64.b64decode(p64).decode())
+        # Verificar expiración
+        from datetime import datetime
+        exp = datetime.fromisoformat(payload.get("exp","2000-01-01"))
+        if datetime.now() > exp: return None
+        return payload
+    except: return None
+
+def get_user_plan(token):
+    """Retorna el plan del usuario desde el token"""
+    payload = verify_token(token)
+    if not payload: return None
+    return payload.get("plan","free")
+
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
     emoji = "🟢" if signal == "BUY" else "🔴"
     sent_emoji = "😊" if news_sent > 0 else "😰" if news_sent < 0 else "😐"
@@ -2284,6 +2308,43 @@ def admin_users():
         return jsonify({"total":len(users),"users":users})
     except Exception as e:
         return jsonify({"error":str(e)})
+
+
+@app.route("/api/auth/verify", methods=["POST"])
+def verify_token_api():
+    """Verifica si un token es válido"""
+    try:
+        data  = request.get_json()
+        token = data.get("token","")
+        payload = verify_token(token)
+        if not payload:
+            return jsonify({"ok":False,"error":"Token inválido o expirado"}), 401
+        return jsonify({"ok":True,"user":payload})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}), 500
+
+@app.route("/api/auth/refresh", methods=["POST"])
+def refresh_token():
+    """Renueva un token válido"""
+    try:
+        import base64, hashlib, json
+        from datetime import timedelta
+        data  = request.get_json()
+        token = data.get("token","")
+        payload = verify_token(token)
+        if not payload:
+            return jsonify({"ok":False,"error":"Token inválido"}), 401
+        # Generar nuevo token con 30 días más
+        new_payload = json.dumps({
+            "user_id": payload["user_id"],
+            "plan": payload["plan"],
+            "exp": (datetime.now()+timedelta(days=30)).isoformat()
+        })
+        p64 = base64.b64encode(new_payload.encode()).decode()
+        sig  = hashlib.sha256(f"{p64}nexus_secret".encode()).hexdigest()[:16]
+        return jsonify({"ok":True,"token":f"{p64}.{sig}"})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)}), 500
 
 @app.route("/api/categories")
 def categories():
