@@ -222,8 +222,8 @@ footer{background:var(--deep);border-top:1px solid rgba(255,255,255,0.04);paddin
     <div class="plan featured">
       <div class="plan-badge">MÁS POPULAR</div>
       <div class="plan-name">PRO</div>
-      <div class="plan-price">$49<span>/mes</span></div>
-      <div class="plan-period">DISPONIBLE PRONTO — LISTA DE ESPERA</div>
+      <div class="plan-price">$29<span>/mes</span></div>
+      <div class="plan-period">PAGO POR WISE — ACTIVACIÓN EN 24H</div>
       <ul class="plan-features">
         <li>Todo lo de Free</li>
         <li>Dashboard completo</li>
@@ -233,13 +233,13 @@ footer{background:var(--deep);border-top:1px solid rgba(255,255,255,0.04);paddin
         <li>Scanner multi-par 24/7</li>
         <li class="no">API access</li>
       </ul>
-      <a href="#waitlist" class="plan-btn pro">LISTA DE ESPERA</a>
+      <a href="#" onclick="showPayment('pro')" class="plan-btn pro">SUSCRIBIRSE — £29/MES</a>
       <div class="plan-note">Abrimos cuando tengamos 200+ trades verificados</div>
     </div>
     <div class="plan">
       <div class="plan-name">ELITE</div>
-      <div class="plan-price">$99<span>/mes</span></div>
-      <div class="plan-period">DISPONIBLE PRONTO</div>
+      <div class="plan-price">$79<span>/mes</span></div>
+      <div class="plan-period">PAGO POR WISE</div>
       <ul class="plan-features">
         <li>Todo lo de Pro</li>
         <li>API access completo</li>
@@ -249,7 +249,7 @@ footer{background:var(--deep);border-top:1px solid rgba(255,255,255,0.04);paddin
         <li>Parámetros personalizables</li>
         <li>Acceso anticipado features</li>
       </ul>
-      <a href="#waitlist" class="plan-btn elite">LISTA DE ESPERA</a>
+      <a href="#" onclick="showPayment('elite')" class="plan-btn elite">SUSCRIBIRSE — £79/MES</a>
     </div>
   </div>
 </div>
@@ -336,5 +336,86 @@ fetch(`${API}/waitlist`).then(r=>r.json()).then(d=>{
   if(el) el.textContent = 'Sé el primero en unirte';
 });
 </script>
+
+<!-- MODAL DE PAGO -->
+<div id="paymentModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#060912;border:1px solid rgba(0,255,136,0.2);border-radius:16px;padding:40px;max-width:480px;width:90%;position:relative">
+    <button onclick="closePayment()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:28px;margin-bottom:8px">⚡</div>
+      <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:#00ff88;margin-bottom:4px">NEXUS APEX</div>
+      <div id="modalPlanTitle" style="font-size:11px;color:#64748b;letter-spacing:2px">PLAN PRO</div>
+    </div>
+
+    <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.1);border-radius:10px;padding:20px;margin-bottom:24px">
+      <div style="font-size:9px;letter-spacing:2px;color:#475569;margin-bottom:12px">INSTRUCCIONES DE PAGO</div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.8">
+        1. Abre tu app de <b style="color:#00ff88">Wise</b><br>
+        2. Envía <b id="modalAmount" style="color:#00ff88">£29</b> a:<br>
+        <div style="background:#02030a;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:10px;margin:8px 0;font-family:JetBrains Mono,monospace;font-size:12px;color:#eef0f8;text-align:center">
+          valachirsuk82@icloud.com
+        </div>
+        3. En el concepto escribe: <b style="color:#fbbf24">NEXUS <span id="modalPlanName">PRO</span></b><br>
+        4. Completa el formulario abajo
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label style="font-size:8px;letter-spacing:2px;color:#475569;display:block;margin-bottom:6px">TU EMAIL (para activar tu cuenta)</label>
+      <input type="email" id="payEmail" placeholder="tu@email.com" style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:white;font:11px JetBrains Mono,monospace;outline:none">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:8px;letter-spacing:2px;color:#475569;display:block;margin-bottom:6px">REFERENCIA DE PAGO WISE (opcional)</label>
+      <input type="text" id="payRef" placeholder="Ej: P3X9K2" style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:white;font:11px JetBrains Mono,monospace;outline:none">
+    </div>
+
+    <button onclick="confirmPayment()" style="width:100%;padding:14px;background:#00ff88;color:#02030a;font:bold 11px JetBrains Mono,monospace;border:none;border-radius:8px;cursor:pointer;letter-spacing:2px">
+      ✅ YA REALICÉ EL PAGO
+    </button>
+    <div id="payMsg" style="text-align:center;font-size:9px;color:#475569;margin-top:12px"></div>
+  </div>
+</div>
+
+<script>
+let currentPlan = 'pro';
+
+function showPayment(plan) {
+  currentPlan = plan;
+  document.getElementById('paymentModal').style.display = 'flex';
+  document.getElementById('modalPlanTitle').textContent = 'PLAN ' + plan.toUpperCase();
+  document.getElementById('modalPlanName').textContent = plan.toUpperCase();
+  document.getElementById('modalAmount').textContent = plan==='pro' ? '£29' : '£79';
+}
+
+function closePayment() {
+  document.getElementById('paymentModal').style.display = 'none';
+}
+
+async function confirmPayment() {
+  const email = document.getElementById('payEmail').value.trim();
+  const ref   = document.getElementById('payRef').value.trim();
+  if (!email || !email.includes('@')) {
+    document.getElementById('payMsg').textContent = '❌ Ingresa tu email';
+    document.getElementById('payMsg').style.color = '#ef4444';
+    return;
+  }
+  const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+    ? 'http://localhost:5001/api' : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+  try {
+    const r = await fetch(`${API}/payment/notify`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, plan: currentPlan, ref})
+    });
+    const d = await r.json();
+    document.getElementById('payMsg').textContent = '✅ Recibido! Te contactaremos en menos de 24h para activar tu cuenta.';
+    document.getElementById('payMsg').style.color = '#10b981';
+    setTimeout(closePayment, 4000);
+  } catch(e) {
+    document.getElementById('payMsg').textContent = '✅ Recibido! Te contactaremos pronto.';
+    document.getElementById('payMsg').style.color = '#10b981';
+  }
+}
+</script>
+
 </body>
 </html>

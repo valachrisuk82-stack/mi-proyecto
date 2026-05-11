@@ -2346,6 +2346,37 @@ def refresh_token():
     except Exception as e:
         return jsonify({"ok":False,"error":str(e)}), 500
 
+
+@app.route("/api/payment/notify", methods=["POST"])
+def payment_notify():
+    """Recibe notificación de pago pendiente y avisa por Telegram"""
+    try:
+        d     = request.get_json()
+        email = d.get("email","")
+        plan  = d.get("plan","pro")
+        ref   = d.get("ref","sin referencia")
+        amount= "£29" if plan=="pro" else "£79"
+
+        # Guardar en archivo de pagos pendientes
+        with open("pending_payments.txt","a") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M')} | {email} | {plan.upper()} | {amount} | ref:{ref}\n")
+
+        # Alerta Telegram
+        msg = (
+            f"💰 <b>PAGO PENDIENTE — NEXUS APEX</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📧 Email: <b>{email}</b>\n"
+            f"💎 Plan:  <b>{plan.upper()}</b>\n"
+            f"💵 Monto: <b>{amount}/mes</b>\n"
+            f"🔖 Ref:   <b>{ref}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Verifica en Wise y activa en /admin"
+        )
+        send_telegram(msg)
+        return jsonify({"ok":True})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)})
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
