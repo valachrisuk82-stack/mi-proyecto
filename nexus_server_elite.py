@@ -2269,6 +2269,26 @@ def paper_trading_thread():
 
 
 
+
+@app.route("/manifest.json")
+def manifest():
+    try:
+        with open("manifest.json","r") as f:
+            return f.read(), 200, {"Content-Type":"application/manifest+json"}
+    except: return "{}", 200
+
+@app.route("/sw.js")
+def service_worker():
+    try:
+        with open("sw.js","r") as f:
+            return f.read(), 200, {"Content-Type":"application/javascript"}
+    except: return "", 200
+
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    from flask import send_from_directory
+    return send_from_directory("static", filename)
+
 @app.route("/mobile")
 def mobile_page():
     try:
