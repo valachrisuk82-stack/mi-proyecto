@@ -2268,6 +2268,15 @@ def paper_trading_thread():
 
 
 
+
+@app.route("/mobile")
+def mobile_page():
+    try:
+        with open("nexus_mobile.html","r") as f:
+            return f.read(), 200, {"Content-Type":"text/html"}
+    except Exception as e:
+        return f"Error: {e}", 500
+
 @app.route("/admin")
 def admin_page():
     try:

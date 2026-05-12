@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#02030a">
+<title>NEXUS APEX</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--neon:#00ff88;--dn:#ff0055;--gold:#ffe600;--bg:#02030a;--surface:#060912;--text:#eef0f8;--text2:#64748b}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;max-width:430px;margin:0 auto;padding-bottom:80px}
+
+/* NAV */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid rgba(0,255,136,0.1);position:sticky;top:0;z-index:100}
+.nav-logo{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--neon);letter-spacing:2px}
+.nav-right{display:flex;align-items:center;gap:8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--neon);animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+.nav-user{font-size:9px;color:var(--text2);letter-spacing:1px}
+.nav-logout{font-size:9px;color:var(--dn);background:none;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace}
+
+/* PAIR SELECTOR */
+.pair-scroll{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,0.04)}
+.pair-scroll::-webkit-scrollbar{display:none}
+.pair-chip{padding:6px 14px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid rgba(255,255,255,0.08);background:none;color:var(--text2);font-family:'JetBrains Mono',monospace;transition:all .15s}
+.pair-chip.on{background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:var(--neon)}
+
+/* PRICE HERO */
+.price-hero{padding:20px 16px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04)}
+.ph-pair{font-size:11px;color:var(--text2);letter-spacing:3px;margin-bottom:4px}
+.ph-price{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:white;margin-bottom:4px}
+.ph-change{font-size:12px;font-weight:600}
+.ph-change.up{color:var(--neon)}
+.ph-change.dn{color:var(--dn)}
+
+/* SIGNAL CARD */
+.signal-card{margin:16px;border-radius:12px;padding:20px;border:1px solid}
+.signal-card.BUY{background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.3)}
+.signal-card.SELL{background:rgba(255,0,85,0.06);border-color:rgba(255,0,85,0.3)}
+.signal-card.WAIT{background:rgba(255,230,0,0.04);border-color:rgba(255,230,0,0.2)}
+.sc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.sc-signal{font-family:'Syne',sans-serif;font-size:28px;font-weight:800}
+.sc-signal.BUY{color:var(--neon)}
+.sc-signal.SELL{color:var(--dn)}
+.sc-signal.WAIT{color:var(--gold)}
+.sc-conf{font-size:10px;color:var(--text2);text-align:right}
+.sc-conf-val{font-size:18px;font-weight:800;color:white}
+.sc-levels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.sc-level{background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;text-align:center}
+.sc-level-label{font-size:7px;letter-spacing:2px;color:var(--text2);margin-bottom:4px}
+.sc-level-val{font-size:12px;font-weight:700}
+.sc-level-val.entry{color:white}
+.sc-level-val.sl{color:var(--dn)}
+.sc-level-val.tp{color:var(--neon)}
+.sc-ml{display:flex;align-items:center;gap:8px}
+.sc-ml-label{font-size:8px;color:var(--text2);white-space:nowrap}
+.sc-ml-bar{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+.sc-ml-fill{height:100%;border-radius:2px;transition:width .5s}
+.sc-ml-val{font-size:10px;font-weight:700;color:white;white-space:nowrap}
+
+/* ACTION BTN */
+.action-btn{display:block;margin:0 16px 16px;padding:16px;border-radius:12px;font:bold 13px 'JetBrains Mono',monospace;letter-spacing:2px;border:none;cursor:pointer;width:calc(100% - 32px);transition:all .2s;text-align:center}
+.action-btn.BUY{background:var(--neon);color:#02030a;box-shadow:0 0 24px rgba(0,255,136,0.3)}
+.action-btn.SELL{background:var(--dn);color:white;box-shadow:0 0 24px rgba(255,0,85,0.3)}
+.action-btn.WAIT{background:rgba(255,230,0,0.1);color:var(--gold);border:1px solid rgba(255,230,0,0.3)}
+
+/* INDICATORS ROW */
+.ind-row{display:flex;gap:8px;padding:0 16px 16px;overflow-x:auto;scrollbar-width:none}
+.ind-row::-webkit-scrollbar{display:none}
+.ind-chip{background:var(--surface);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 12px;text-align:center;flex-shrink:0;min-width:70px}
+.ind-chip-label{font-size:7px;letter-spacing:1px;color:var(--text2);margin-bottom:3px}
+.ind-chip-val{font-size:12px;font-weight:700}
+
+/* SCANNER */
+.section-title{font-size:8px;letter-spacing:3px;color:var(--text2);padding:0 16px 8px;text-transform:uppercase}
+.scan-card{margin:0 16px 8px;background:var(--surface);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all .15s}
+.scan-card:active{transform:scale(0.98)}
+.scan-card-left{display:flex;flex-direction:column;gap:2px}
+.scan-pair{font-size:13px;font-weight:700}
+.scan-price{font-size:10px;color:var(--text2)}
+.scan-card-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.scan-sig{font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px}
+.scan-sig.LONG{background:rgba(0,255,136,0.1);color:var(--neon)}
+.scan-sig.SHORT{background:rgba(255,0,85,0.1);color:var(--dn)}
+.scan-conf{font-size:9px;color:var(--text2)}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid rgba(255,255,255,0.06);display:flex;z-index:100}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px;cursor:pointer;border:none;background:none;color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:1px;transition:color .15s}
+.bn-item.on{color:var(--neon)}
+.bn-icon{font-size:20px;margin-bottom:2px}
+
+/* PAGES */
+.page{display:none}
+.page.on{display:block}
+
+/* STATS PAGE */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:16px}
+.stat-card{background:var(--surface);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;text-align:center}
+.stat-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:4px}
+.stat-label{font-size:7px;letter-spacing:2px;color:var(--text2)}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--text2);font-size:11px}
+.spin{display:inline-block;animation:spin 1s linear infinite;font-size:20px;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- AUTH CHECK -->
+<script>
+const token = localStorage.getItem('nexus_token');
+const userStr = localStorage.getItem('nexus_user');
+if (!token || !userStr) window.location.href = '/login';
+const _user = JSON.parse(userStr || '{}');
+const API = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
+  ? 'http://localhost:5001/api' : 'https://mi-proyecto-production-29a8.up.railway.app/api';
+</script>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-logo">⚡ NEXUS</div>
+  <div class="nav-right">
+    <div class="live-dot"></div>
+    <span class="nav-user" id="navUser">--</span>
+    <button class="nav-logout" onclick="logout()">SALIR</button>
+  </div>
+</div>
+
+<!-- PAGES -->
+
+<!-- PAGE: SEÑAL -->
+<div class="page on" id="pageSignal">
+  <!-- Pair selector -->
+  <div class="pair-scroll" id="pairScroll"></div>
+
+  <!-- Price hero -->
+  <div class="price-hero">
+    <div class="ph-pair" id="mPair">BTC/USDT</div>
+    <div class="ph-price" id="mPrice">$--</div>
+    <div class="ph-change" id="mChange">--</div>
+  </div>
+
+  <!-- Signal card -->
+  <div class="signal-card WAIT" id="mSignalCard">
+    <div class="sc-top">
+      <div class="sc-signal WAIT" id="mSig">WAIT</div>
+      <div class="sc-conf">
+        <div style="font-size:7px;letter-spacing:1px;margin-bottom:2px">CONFIANZA</div>
+        <div class="sc-conf-val" id="mConf">--%</div>
+      </div>
+    </div>
+    <div class="sc-levels">
+      <div class="sc-level"><div class="sc-level-label">ENTRY</div><div class="sc-level-val entry" id="mEntry">--</div></div>
+      <div class="sc-level"><div class="sc-level-label">STOP</div><div class="sc-level-val sl" id="mSL">--</div></div>
+      <div class="sc-level"><div class="sc-level-label">TARGET</div><div class="sc-level-val tp" id="mTP">--</div></div>
+    </div>
+    <div class="sc-ml">
+      <span class="sc-ml-label">ML</span>
+      <div class="sc-ml-bar"><div class="sc-ml-fill" id="mMLBar" style="width:0%;background:#00ff88"></div></div>
+      <span class="sc-ml-val" id="mML">--</span>
+    </div>
+  </div>
+
+  <!-- Action button -->
+  <button class="action-btn WAIT" id="mActionBtn" onclick="copyLevels()">📋 COPIAR NIVELES</button>
+
+  <!-- Indicators -->
+  <div class="ind-row">
+    <div class="ind-chip"><div class="ind-chip-label">RSI</div><div class="ind-chip-val" id="mRSI">--</div></div>
+    <div class="ind-chip"><div class="ind-chip-label">MACD</div><div class="ind-chip-val" id="mMACD">--</div></div>
+    <div class="ind-chip"><div class="ind-chip-label">EMA</div><div class="ind-chip-val" id="mEMA">--</div></div>
+    <div class="ind-chip"><div class="ind-chip-label">BB%</div><div class="ind-chip-val" id="mBB">--</div></div>
+    <div class="ind-chip"><div class="ind-chip-label">ATR</div><div class="ind-chip-val" id="mATR">--</div></div>
+    <div class="ind-chip"><div class="ind-chip-label">R:R</div><div class="ind-chip-val" id="mRR" style="color:#00ff88">--</div></div>
+  </div>
+</div>
+
+<!-- PAGE: SCANNER -->
+<div class="page" id="pageScan">
+  <div style="padding:16px 0 8px">
+    <div class="section-title">MEJORES SETUPS SMC</div>
+    <div id="scanList"><div class="loading"><div class="spin">⚡</div><br>Escaneando mercado...</div></div>
+  </div>
+</div>
+
+<!-- PAGE: STATS -->
+<div class="page" id="pageStats">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-val" id="stWR" style="color:#00ff88">--%</div><div class="stat-label">WIN RATE</div></div>
+    <div class="stat-card"><div class="stat-val" id="stPF" style="color:#fbbf24">--</div><div class="stat-label">PROFIT FACTOR</div></div>
+    <div class="stat-card"><div class="stat-val" id="stR" style="color:#3b82f6">--</div><div class="stat-label">NET R</div></div>
+    <div class="stat-card"><div class="stat-val" id="stDD" style="color:#ef4444">--</div><div class="stat-label">MAX DD</div></div>
+    <div class="stat-card"><div class="stat-val" id="stTotal" style="color:#a855f7">--</div><div class="stat-label">TRADES</div></div>
+    <div class="stat-card"><div class="stat-val" id="stDays" style="color:#64748b">--</div><div class="stat-label">DÍAS</div></div>
+  </div>
+  <div style="padding:0 16px">
+    <a href="/track" style="display:block;text-align:center;padding:14px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:10px;color:#00ff88;font:bold 10px JetBrains Mono,monospace;letter-spacing:2px;text-decoration:none">VER TRACK RECORD COMPLETO →</a>
+  </div>
+</div>
+
+<!-- PAGE: CUENTA -->
+<div class="page" id="pageAccount">
+  <div style="padding:24px 16px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">👤</div>
+    <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;margin-bottom:4px" id="accName">--</div>
+    <div style="font-size:10px;color:#64748b;margin-bottom:4px" id="accEmail">--</div>
+    <div style="display:inline-block;padding:3px 12px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:1px;background:rgba(0,255,136,0.1);color:#00ff88;border:1px solid rgba(0,255,136,0.3);margin-bottom:24px" id="accPlan">FREE</div>
+    <div style="background:#060912;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:16px;text-align:left">
+      <div style="font-size:8px;letter-spacing:2px;color:#475569;margin-bottom:12px">ACCESO RÁPIDO</div>
+      <a href="/" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#eef0f8;text-decoration:none;font-size:11px">📊 Dashboard completo <span style="color:#475569">→</span></a>
+      <a href="/track" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#eef0f8;text-decoration:none;font-size:11px">📈 Track record <span style="color:#475569">→</span></a>
+      <a href="/landing" style="display:flex;justify-content:space-between;padding:12px 0;color:#eef0f8;text-decoration:none;font-size:11px">💎 Planes y precios <span style="color:#475569">→</span></a>
+    </div>
+    <button onclick="logout()" style="width:100%;padding:14px;background:rgba(255,0,85,0.08);border:1px solid rgba(255,0,85,0.3);border-radius:10px;color:#ff0055;font:bold 11px JetBrains Mono,monospace;cursor:pointer;letter-spacing:2px">CERRAR SESIÓN</button>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="bn-item on" id="bn0" onclick="showPage('Signal',0)"><div class="bn-icon">📊</div>SEÑAL</button>
+  <button class="bn-item" id="bn1" onclick="showPage('Scan',1)"><div class="bn-icon">🔍</div>SCAN</button>
+  <button class="bn-item" id="bn2" onclick="showPage('Stats',2)"><div class="bn-icon">📈</div>STATS</button>
+  <button class="bn-item" id="bn3" onclick="showPage('Account',3)"><div class="bn-icon">👤</div>CUENTA</button>
+</div>
+
+<script>
+// ── STATE ──
+let currentPair = 'BTCUSDT';
+const PAIRS = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','LINKUSDT'];
+
+// ── INIT ──
+document.getElementById('navUser').textContent = _user.username?.toUpperCase() || '--';
+document.getElementById('accName').textContent = _user.username || '--';
+document.getElementById('accEmail').textContent = _user.email || '--';
+document.getElementById('accPlan').textContent = (_user.plan || 'FREE').toUpperCase();
+
+// ── PAIR CHIPS ──
+const scroll = document.getElementById('pairScroll');
+PAIRS.forEach(p => {
+  const btn = document.createElement('button');
+  btn.className = 'pair-chip' + (p===currentPair?' on':'');
+  btn.textContent = p.replace('USDT','');
+  btn.onclick = () => selectPair(p);
+  scroll.appendChild(btn);
+});
+
+function selectPair(pair) {
+  currentPair = pair;
+  document.querySelectorAll('.pair-chip').forEach((b,i) => {
+    b.classList.toggle('on', PAIRS[i]===pair);
+  });
+  document.getElementById('mPair').textContent = pair.replace('USDT','/USDT');
+  loadSignal(pair);
+}
+
+// ── LOAD SIGNAL ──
+async function loadSignal(pair) {
+  try {
+    const [priceR, indR] = await Promise.all([
+      fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`),
+      fetch(`${API}/indicators/${pair}`)
+    ]);
+    const ticker = await priceR.json();
+    const ind    = await indR.json();
+
+    const price  = parseFloat(ticker.lastPrice);
+    const change = parseFloat(ticker.priceChangePercent);
+    const sig    = ind.signal || {};
+    const i      = ind.indicators || {};
+    const atr    = i.atr || price*0.015;
+    const signal = sig.signal || 'WAIT';
+    const conf   = sig.confidence || 50;
+    const ml     = sig.ml_score || 50;
+
+    // Price
+    document.getElementById('mPrice').textContent = '$' + price.toLocaleString(undefined,{maximumFractionDigits:4});
+    const chEl = document.getElementById('mChange');
+    chEl.textContent = (change>=0?'+':'')+change.toFixed(2)+'%';
+    chEl.className = 'ph-change ' + (change>=0?'up':'dn');
+
+    // Signal
+    const sl = signal==='BUY' ? price-atr*1.5 : price+atr*1.5;
+    const tp = signal==='BUY' ? price+atr*3   : price-atr*3;
+    const rr = Math.abs(tp-price)/Math.max(0.0001,Math.abs(price-sl));
+
+    document.getElementById('mSig').textContent = signal;
+    document.getElementById('mSig').className = 'sc-signal ' + signal;
+    document.getElementById('mSignalCard').className = 'signal-card ' + signal;
+    document.getElementById('mConf').textContent = conf + '%';
+    document.getElementById('mEntry').textContent = '$'+price.toLocaleString(undefined,{maximumFractionDigits:2});
+    document.getElementById('mSL').textContent = '$'+sl.toLocaleString(undefined,{maximumFractionDigits:2});
+    document.getElementById('mTP').textContent = '$'+tp.toLocaleString(undefined,{maximumFractionDigits:2});
+    document.getElementById('mRR').textContent = '1:'+rr.toFixed(1);
+
+    // ML bar
+    const mlColor = ml>=65?'#00ff88':ml<=35?'#ff0055':'#ffe600';
+    document.getElementById('mMLBar').style.width = ml+'%';
+    document.getElementById('mMLBar').style.background = mlColor;
+    document.getElementById('mML').textContent = ml+'/100';
+
+    // Action btn
+    const btn = document.getElementById('mActionBtn');
+    btn.className = 'action-btn ' + signal;
+    btn.textContent = signal==='BUY'?'🟢 SEÑAL DE COMPRA':signal==='SELL'?'🔴 SEÑAL DE VENTA':'⏳ ESPERAR SEÑAL';
+
+    // Indicators
+    document.getElementById('mRSI').textContent = (i.rsi||0).toFixed(1);
+    document.getElementById('mRSI').style.color = i.rsi>65?'#ff0055':i.rsi<35?'#00ff88':'#ffe600';
+    document.getElementById('mMACD').textContent = i.macd?.hist>0?'▲':'▼';
+    document.getElementById('mMACD').style.color = i.macd?.hist>0?'#00ff88':'#ff0055';
+    document.getElementById('mEMA').textContent = i.ema9>i.ema21?'9>21':'9<21';
+    document.getElementById('mEMA').style.color = i.ema9>i.ema21?'#00ff88':'#ff0055';
+    document.getElementById('mBB').textContent = (i.bb?.pos||0).toFixed(0)+'%';
+    document.getElementById('mATR').textContent = (i.atr||0).toFixed(4);
+
+    // Save for copy
+    window._levels = {pair,price,sl,tp,rr,signal,conf};
+  } catch(e) { console.error(e); }
+}
+
+// ── COPY LEVELS ──
+function copyLevels() {
+  if (!window._levels) return;
+  const l = window._levels;
+  const text = `⚡ NEXUS APEX — ${l.pair}\n${l.signal} @ $${l.price.toLocaleString()}\nSL: $${l.sl.toLocaleString()}\nTP: $${l.tp.toLocaleString()}\nR:R 1:${l.rr.toFixed(1)}`;
+  navigator.clipboard?.writeText(text).then(() => {
+    const btn = document.getElementById('mActionBtn');
+    const orig = btn.textContent;
+    btn.textContent = '✅ COPIADO!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// ── SCANNER ──
+async function loadScan() {
+  try {
+    const r = await fetch(`${API}/smc_scan`);
+    const d = await r.json();
+    const list = document.getElementById('scanList');
+    const history = d.history || [];
+    if (!history.length) {
+      list.innerHTML = '<div class="loading">Sin setups activos.<br>El scanner corre cada 5 min.</div>';
+      return;
+    }
+    list.innerHTML = history.map(s => {
+      const isLong = s.signal==='LONG';
+      return `<div class="scan-card" onclick="selectPairAndGo('${s.pair}')">
+        <div class="scan-card-left">
+          <div class="scan-pair" style="color:${isLong?'#00ff88':'#ff0055'}">${s.pair.replace('USDT','')}/USDT</div>
+          <div class="scan-price">$${s.price?.toLocaleString()}</div>
+        </div>
+        <div class="scan-card-right">
+          <div class="scan-sig ${s.signal}">${s.signal}</div>
+          <div class="scan-conf">${s.confidence}% conf</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+function selectPairAndGo(pair) {
+  showPage('Signal', 0);
+  selectPair(pair);
+}
+
+// ── STATS ──
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/paper/stats`);
+    const d = await r.json();
+    document.getElementById('stWR').textContent = d.wr+'%';
+    document.getElementById('stPF').textContent = d.pf||'--';
+    document.getElementById('stR').textContent  = (d.net_r>=0?'+':'')+d.net_r+'R';
+    document.getElementById('stDD').textContent = d.max_dd+'R';
+    document.getElementById('stTotal').textContent = d.total||0;
+    document.getElementById('stDays').textContent = (d.days_running||0)+'d';
+  } catch(e) {}
+}
+
+// ── NAVIGATION ──
+function showPage(name, idx) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page'+name).classList.add('on');
+  document.getElementById('bn'+idx).classList.add('on');
+  if (name==='Scan') loadScan();
+  if (name==='Stats') loadStats();
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login';
+}
+
+// ── START ──
+loadSignal(currentPair);
+setInterval(() => loadSignal(currentPair), 30000);
+</script>
+</body>
+</html>
