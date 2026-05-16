@@ -233,7 +233,7 @@ canvas{position:absolute;top:0;left:0}
 .ai-panel-title{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon-up)}
 .ai-panel-arrow{font-size:12px;color:var(--neon-up);transition:transform .3s}
 .ai-panel.collapsed .ai-panel-arrow{transform:rotate(180deg)}
-.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
+.ai-panel-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;height:260px;overflow:hidden}
 .ai-col{padding:10px 14px;border-right:1px solid var(--border);overflow-y:auto}
 .ai-col:last-child{border-right:none}
 .ai-col-title{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px;font-family:'Syne',sans-serif}
@@ -264,7 +264,8 @@ canvas{position:absolute;top:0;left:0}
     <div class="pill pill-tg" id="tgPill">📱 TG</div>
     <div class="pill pill-live"><div class="pill-dot"></div><span id="liveText">Conectando</span></div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:4px">
-      <span style="font-size:9px;color:#475569;letter-spacing:1px" id="userDisplay">--</span>
+      <span id="londonTime" style="font-size:9px;color:#00e5ff;letter-spacing:1px;font-family:'JetBrains Mono',monospace">🇬🇧 --:--</span>
+    <span style="font-size:9px;color:#475569;letter-spacing:1px" id="userDisplay">--</span>
       <button onclick="logout()" style="padding:3px 10px;font:bold 8px JetBrains Mono,monospace;border:1px solid rgba(255,0,85,0.3);border-radius:4px;background:none;color:#ff0055;cursor:pointer;letter-spacing:1px">SALIR</button>
     </div>
     <div class="clock-el" id="clockEl">🇬🇧 --:--:--</div>
@@ -343,19 +344,14 @@ canvas{position:absolute;top:0;left:0}
       <span style="color:var(--text3);font-size:9px">ML</span> <span id="mlScore" style="color:var(--gold);font-weight:700;font-size:10px">--</span><span id="rpBadge" style="color:var(--up);margin-left:auto;font-size:9px">● REAL</span>
     </div>
     <!-- PATTERNS -->
-    <div class="pattern-bar" id="patternBar">
-      <span class="pnone">Sin patrones detectados</span>
-    </div>
+
 
     <!-- CHART -->
     <div class="chart-wrap" id="chartWrap">
       <canvas id="candleCanvas"></canvas>
   <div style="position:absolute;top:36px;right:78px;display:flex;gap:4px;z-index:10">
-    <button onclick="SMC.enabled.ob=!SMC.enabled.ob;this.style.opacity=SMC.enabled.ob?1:0.35;drawCandles(S.candles)" style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.6);color:#10b981;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">OB</button>
-    <button onclick="SMC.enabled.fvg=!SMC.enabled.fvg;this.style.opacity=SMC.enabled.fvg?1:0.35;drawCandles(S.candles)" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.6);color:#fbbf24;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">FVG</button>
-    <button onclick="SMC.enabled.bos=!SMC.enabled.bos;this.style.opacity=SMC.enabled.bos?1:0.35;drawCandles(S.candles)" style="background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.6);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">BOS</button>
-    <button onclick="S.showSessions=!S.showSessions;this.style.opacity=S.showSessions?1:0.35;drawCandles(S.candles)" style="background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.6);color:#3b82f6;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">SES</button>
-    <button onclick="S.showLiquidity=!S.showLiquidity;this.style.opacity=S.showLiquidity?1:0.35;drawCandles(S.candles)" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.6);color:#fbbf24;font:bold 8px JetBrains Mono,monospace;padding:2px 7px;border-radius:3px;cursor:pointer;opacity:1">LIQ</button>
+
+
   </div>
       <canvas id="overlayCanvas" style="pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
   <canvas id="crosshairCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
@@ -385,7 +381,7 @@ canvas{position:absolute;top:0;left:0}
 
 <div class="ai-panel" id="aiPanel">
   <div class="ai-panel-toggle" onclick="toggleAiPanel()">
-    <span class="ai-panel-title">▶ ANÁLISIS IA + NIVELES + MTF + CONFIGURACIÓN + JOURNAL</span>
+    <span class="ai-panel-title">▶ ANÁLISIS + NIVELES + CONFIGURACIÓN</span>
     <span class="ai-panel-arrow" id="panelArrow">▲</span>
   </div>
   <div class="ai-panel-body">
@@ -418,21 +414,6 @@ canvas{position:absolute;top:0;left:0}
       </div>
     </div>
 
-    <!-- COL 3: MTF + CONFLUENCIA -->
-    <div class="ai-col">
-      <div class="ai-col-title">Multi-Timeframe</div>
-      <div class="mtf-grid" id="mtfGrid" style="padding:0;margin-bottom:8px">
-        <div class="mtf-cell"><div class="mtf-tf">M1</div><div class="mtf-rsi" id="mtf-m1-rsi">--</div><div class="mtf-trend neu" id="mtf-m1-tr">--</div></div>
-        <div class="mtf-cell"><div class="mtf-tf">M5</div><div class="mtf-rsi" id="mtf-m5-rsi">--</div><div class="mtf-trend neu" id="mtf-m5-tr">--</div></div>
-        <div class="mtf-cell"><div class="mtf-tf">M15</div><div class="mtf-rsi" id="mtf-m15-rsi">--</div><div class="mtf-trend neu" id="mtf-m15-tr">--</div></div>
-        <div class="mtf-cell"><div class="mtf-tf">H1</div><div class="mtf-rsi" id="mtf-h1-rsi">--</div><div class="mtf-trend neu" id="mtf-h1-tr">--</div></div>
-      </div>
-      <div class="conf-block neu" id="confBlock" style="margin:0">
-        <div><div class="conf-label">CONFLUENCIA</div><div class="conf-val neu" id="confVal">--</div></div>
-        <button class="mtf-btn" id="mtfBtn" onclick="runMTF()" style="width:auto;padding:4px 10px">⬡ MTF</button>
-      </div>
-    </div>
-
     <!-- COL 4: CONFIG + BOTONES -->
     <div class="ai-col">
       <div class="ai-col-title">Configuración</div>
@@ -449,63 +430,7 @@ canvas{position:absolute;top:0;left:0}
       </div>
     </div>
 
-    <!-- COL 6: JOURNAL -->
-    <div class="ai-col" style="border-left:1px solid rgba(245,158,11,0.2)">
-      <div class="ai-col-title" style="color:#f59e0b">JOURNAL</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;margin-bottom:5px">
-        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:3px;padding:2px;text-align:center">
-          <div style="color:#64748b;font:5px JetBrains Mono,monospace">WR%</div>
-          <div id="jWR" style="color:#10b981;font:bold 10px JetBrains Mono,monospace">--%</div>
-        </div>
-        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:3px;padding:2px;text-align:center">
-          <div style="color:#64748b;font:5px JetBrains Mono,monospace">PF</div>
-          <div id="jPF" style="color:#fbbf24;font:bold 10px JetBrains Mono,monospace">--</div>
-        </div>
-        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:3px;padding:2px;text-align:center">
-          <div style="color:#64748b;font:5px JetBrains Mono,monospace">NET R</div>
-          <div id="jNetR" style="color:#3b82f6;font:bold 10px JetBrains Mono,monospace">--</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:5px">
-        <div style="background:rgba(2,3,10,0.5);border:1px solid rgba(255,255,255,0.06);border-radius:3px;padding:2px;text-align:center">
-          <div style="color:#64748b;font:5px JetBrains Mono,monospace">ABIERTAS</div>
-          <div id="jOpen" style="color:#10b981;font:bold 10px JetBrains Mono,monospace">0/3</div>
-        </div>
-        <div style="background:rgba(2,3,10,0.5);border:1px solid rgba(255,255,255,0.06);border-radius:3px;padding:2px;text-align:center">
-          <div style="color:#64748b;font:5px JetBrains Mono,monospace">HOY</div>
-          <div id="jToday" style="color:#fbbf24;font:bold 10px JetBrains Mono,monospace">+0R</div>
-        </div>
-      </div>
-      <div id="jBlocked" style="text-align:center;font:bold 8px JetBrains Mono,monospace;color:#10b981;margin-bottom:4px">✅ ACTIVO</div>
-      <div id="jTradeList" style="overflow-y:auto;max-height:110px;display:flex;flex-direction:column;gap:2px">
-        <div style="color:#475569;font:7px JetBrains Mono,monospace;text-align:center;padding:10px 0">Sin operaciones registradas</div>
-      </div>
-    </div>
-    <!-- COL 5: SMC SCANNER -->
-    <div class="ai-col" style="border-left:1px solid rgba(168,85,247,0.2)">
-      <div class="ai-col-title" style="color:#a855f7">SMC SCANNER</div>
-      <div style="display:flex;gap:4px;margin-bottom:6px">
-        <button onclick="runSMCScan()" style="flex:1;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.5);color:#a855f7;font:bold 8px JetBrains Mono,monospace;padding:4px;border-radius:3px;cursor:pointer">⚡ SCAN</button>
-        <div id="smcScanStatus" style="font:7px JetBrains Mono,monospace;color:#64748b;display:flex;align-items:center;padding:0 4px">--:--</div>
-      </div>
-      <div id="smcStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:6px">
-        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:3px;padding:3px;text-align:center">
-          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">WR%</div>
-          <div id="smcStatWR" style="color:#10b981;font:bold 11px JetBrains Mono,monospace">--%</div>
-        </div>
-        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:3px;padding:3px;text-align:center">
-          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">PF</div>
-          <div id="smcStatPF" style="color:#fbbf24;font:bold 11px JetBrains Mono,monospace">--</div>
-        </div>
-        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:3px;padding:3px;text-align:center">
-          <div style="color:#64748b;font:6px JetBrains Mono,monospace;letter-spacing:1px">NET R</div>
-          <div id="smcStatR" style="color:#3b82f6;font:bold 11px JetBrains Mono,monospace">--</div>
-        </div>
-      </div>
-      <div id="smcScanList" style="overflow-y:auto;max-height:185px;display:flex;flex-direction:column;gap:3px">
-        <div style="color:#475569;font:8px JetBrains Mono,monospace;text-align:center;padding:20px 0">Sin señales aún.<br>Presiona SCAN</div>
-      </div>
-    </div>
+
   </div>
 </div>
 
@@ -957,7 +882,7 @@ function drawCandles(candles) {
   const cv=document.getElementById("candleCanvas");
   const ov=document.getElementById("overlayCanvas");
   const W=wrap.clientWidth,H=wrap.clientHeight;
-  const dpr=window.devicePixelRatio||2;
+  const dpr=Math.min(window.devicePixelRatio||2, 3);
   cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+"px";cv.style.height=H+"px";
   ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+"px";ov.style.height=H+"px";
   const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
@@ -984,7 +909,7 @@ function drawCandles(candles) {
     const y=pad.top+(cH/6)*i;
     ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
     const price=hi-((hi-lo)/6)*i;
-    ctx.fillStyle="rgba(148,163,184,0.8)";ctx.font="9px 'JetBrains Mono'";
+    ctx.fillStyle="rgba(148,163,184,0.8)";ctx.font="bold 9px 'JetBrains Mono'";
     ctx.fillText(price.toLocaleString(undefined,{maximumFractionDigits:2}),W-pad.right+4,y+3);
   }
   const step=Math.max(1,Math.floor(n/7));
@@ -1049,12 +974,7 @@ function drawCandles(candles) {
     ctx.fillStyle="rgba(251,146,60,0.9)";
     ctx.fillText("EMA21", lastX-32, toY(ema21arr[ema21arr.length-1])+10);
   }
-  // S/R lines
-  const sr=S.srData[S.pair];
-  if(sr){
-    sr.resistance?.forEach(r=>{if(r>lo&&r<hi){const y=toY(r);ctx.strokeStyle="rgba(244,63,94,0.2)";ctx.lineWidth=1;ctx.setLineDash([3,5]);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="rgba(244,63,94,0.5)";ctx.font="7px 'JetBrains Mono'";ctx.fillText("R",W-pad.right+2,y+3);}});
-    sr.support?.forEach(s=>{if(s>lo&&s<hi){const y=toY(s);ctx.strokeStyle="rgba(16,185,129,0.2)";ctx.lineWidth=1;ctx.setLineDash([3,5]);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="rgba(16,185,129,0.5)";ctx.font="7px 'JetBrains Mono'";ctx.fillText("S",W-pad.right+2,y+3);}});
-  }
+
 
   // Candles
   candles.forEach((c,i)=>{
@@ -1068,7 +988,7 @@ function drawCandles(candles) {
     // Mecha con glow
     ctx.shadowColor = isBull ? colUG : colDG;
     ctx.shadowBlur = 2;
-    ctx.strokeStyle=isBull?colU:colD;ctx.lineWidth=1;
+    ctx.strokeStyle=isBull?colU:colD;ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(cx,hi_y);ctx.lineTo(cx,lo_y);ctx.stroke();
     ctx.shadowBlur = 0;
     // Cuerpo con gradiente
@@ -1108,9 +1028,7 @@ function drawCandles(candles) {
   detectSMC(candles);
   checkSMCSignal(candles);
   drawSessionsAndLiquidity(candles,cv.getContext("2d"),W,H,pad,lo,hi,cH,toY);
-  drawSessionsAndLiquidity(candles, cv.getContext("2d"), W, H, pad, lo, hi, cH, toY);
   const smcCtx=cv.getContext("2d");
-  drawSMC(candles,smcCtx,W,H,pad,lo,hi,cH,toY);
   drawLevels(ov,W,H,pad,lo,hi,cH,toY);
 }
 
@@ -1602,7 +1520,10 @@ async function fetchIndicators(pair) {
     if(d.signal){S.sigs[pair]=d.signal;S.mlScores[pair]=d.signal.ml_score||0;}
     if(d.indicators?.sr){S.srData[pair]=d.indicators.sr;renderSR(pair);}
     renderIndicators(pair);updatePatterns(pair);
+    const nowLondon = new Date().toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit',second:'2-digit'});
     document.getElementById("updTime").textContent=new Date().toTimeString().slice(0,8);
+    const londonEl = document.getElementById("londonTime");
+    if(londonEl) londonEl.textContent = '🇬🇧 '+nowLondon;
     drawCandles(S.candles);
     updateChartHeader(pair);
   }catch{}
