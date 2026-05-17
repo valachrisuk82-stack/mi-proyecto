@@ -960,6 +960,21 @@ _analyze_cache = {}
 _analyze_cache_time = {}
 ANALYZE_CACHE_TTL = 300  # 5 minutos
 
+
+def get_global_market_data():
+    """Obtiene dominancia BTC, volumen total, datos macro"""
+    try:
+        r = requests.get("https://api.coingecko.com/api/v3/global", timeout=5)
+        d = r.json().get("data", {})
+        return {
+            "btc_dominance": round(d.get("market_cap_percentage", {}).get("btc", 0), 1),
+            "total_volume_24h": round(d.get("total_volume", {}).get("usd", 0) / 1e9, 1),
+            "market_cap_change": round(d.get("market_cap_change_percentage_24h_usd", 0), 2),
+            "active_cryptos": d.get("active_cryptocurrencies", 0),
+        }
+    except:
+        return {"btc_dominance": 0, "total_volume_24h": 0, "market_cap_change": 0}
+
 def analyze_local(pair):
     """Análisis local sin IA cuando no hay créditos"""
     ticker = cache["tickers"].get(pair, {})
@@ -1021,6 +1036,7 @@ def analyze_ai(pair):
     headlines_str = "\n".join(f"  • {h}" for h in news.get("headlines",[])[:3]) or "  Sin noticias recientes"
     patterns_str  = ", ".join(p["name"] for p in ind.get("patterns",[])) or "Ninguno"
 
+    gmd = get_global_market_data()
     prompt = f"""Eres NEXUS PRO ELITE AI — sistema institucional de análisis crypto con ML integrado.
 Responde ÚNICAMENTE con JSON válido.
 
@@ -1050,6 +1066,9 @@ Headlines:
 {headlines_str}
 
 FEAR & GREED: {fgi['value']} ({fgi['label']})
+MERCADO GLOBAL:
+BTC Dominancia: {gmd['btc_dominance']}% | Vol 24h: ${gmd['total_volume_24h']}B
+Market Cap Change 24h: {gmd['market_cap_change']}%
 
 GESTIÓN RIESGO:
 Capital: ${capital} | Riesgo: {risk}% | SL=1.5xATR | TP=3xATR

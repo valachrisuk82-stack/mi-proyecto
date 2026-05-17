@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --void:    #02030a;
+  --void:    #000000;
   --deep:    #04060e;
   --surface: #080c18;
   --raised:  #0c1220;
@@ -117,7 +117,7 @@ html,body{height:100vh;overflow:hidden;background:var(--void);color:var(--text);
 .ptag.bear{background:rgba(255,0,85,0.08);color:var(--neon-dn);border:1px solid rgba(255,0,85,0.3);box-shadow:0 0 6px rgba(255,0,85,0.1)}
 .ptag.neutral{background:rgba(255,230,0,0.07);color:var(--neon-gold);border:1px solid rgba(255,230,0,0.25)}
 .pnone{font-size:9px;color:var(--text3);letter-spacing:1px}
-.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:242px}
+.chart-wrap{flex:1;position:relative;overflow:hidden;background:var(--void);margin-bottom:220px}
 canvas{position:absolute;top:0;left:0}
 .ml-overlay{position:absolute;top:10px;left:12px;background:rgba(2,3,10,0.92);border:1px solid rgba(0,255,136,0.25);border-radius:7px;padding:8px 12px;pointer-events:none;z-index:5;box-shadow:0 0 20px rgba(0,255,136,0.1)}
 .ml-ov-label{font-size:7px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
@@ -422,8 +422,8 @@ canvas{position:absolute;top:0;left:0}
       <button class="analyze-btn" id="analyzeBtn" onclick="runAI()">▶ ANALIZAR CON IA</button><span id="aiSpin" style="display:none;margin-left:6px">⏳</span>
       <div id="aiWarn" style="display:none;color:var(--dn);font-size:10px;margin-top:4px"></div>
       <div id="aiWhale" style="display:none;color:var(--gold);font-size:10px;margin-top:4px">🐋 Actividad ballena detectada</div>
-      <button class="mtf-btn" id="mtfBtn2" onclick="runMTF()" style="margin-top:5px">⬡ ANALIZAR MULTI-TIMEFRAME</button>
-      <button class="mtf-btn" onclick="showPrediction(this)" style="margin-top:4px;border-color:rgba(168,85,247,0.4);color:#a855f7">🔮 PREDECIR PRECIO</button><span id="mtfStatus" style="font-size:9px;color:var(--text3);margin-left:6px"></span>
+      
+      on><span id="mtfStatus" style="font-size:9px;color:var(--text3);margin-left:6px"></span>
       <div class="upd-bar" style="margin-top:8px;padding:4px 0">
         <span>UPD: <span id="updTime">--</span></span>
         <span class="upd-real" id="dataSource">DEMO</span>
@@ -500,7 +500,7 @@ const CAT_ICONS = {
 const S = {
   pair: "BTCUSDT", tf: "1m",
   tickers: {}, inds: {}, sigs: {}, srData: {},
-  candles: [], serverOk: false, showSessions: true, showLiquidity: true,
+  candles: [], serverOk: false, showSessions: false, showLiquidity: true,
   slP: null, tpP: null, trailP: null,
   mlScores: {}, filter: "ALL", category: "ALL",
 };
@@ -887,7 +887,7 @@ function drawCandles(candles) {
   ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+"px";ov.style.height=H+"px";
   const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
 
-  const pad={top:16,bottom:28,left:6,right:70};
+  const pad={top:16,bottom:28,left:6,right:85};
   const cW=W-pad.left-pad.right,cH=H-pad.top-pad.bottom;
   const prices=candles.flatMap(c=>[c.high,c.low]);
   const minP=Math.min(...prices),maxP=Math.max(...prices);
@@ -900,25 +900,24 @@ function drawCandles(candles) {
 
   // Background grid
   // Fondo
-  const bgGrad = ctx.createLinearGradient(0,0,0,H);
-  bgGrad.addColorStop(0,'#060912');
-  bgGrad.addColorStop(1,'#0a0e1a');
-  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=0.5;
-  for(let i=0;i<=6;i++){
-    const y=pad.top+(cH/6)*i;
-    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
-    const price=hi-((hi-lo)/6)*i;
-    ctx.fillStyle="rgba(148,163,184,0.8)";ctx.font="bold 9px 'JetBrains Mono'";
+  // Fondo negro puro estilo MT5
+  ctx.fillStyle='#000000';ctx.fillRect(0,0,W,H);
+  // Grid fino gris oscuro
+  ctx.strokeStyle="rgba(128,128,128,0.25)";ctx.lineWidth=0.5;
+  for(let i=0;i<=8;i++){
+    const y=pad.top+(cH/8)*i;
+    ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    const price=hi-((hi-lo)/8)*i;
+    ctx.fillStyle="rgba(220,220,220,0.9)";ctx.font="9px 'JetBrains Mono'";
     ctx.fillText(price.toLocaleString(undefined,{maximumFractionDigits:2}),W-pad.right+4,y+3);
   }
   const step=Math.max(1,Math.floor(n/7));
-  ctx.strokeStyle="rgba(255,255,255,0.02)";
+  ctx.strokeStyle="rgba(255,255,255,0.07)";
   for(let i=0;i<n;i+=step){
     const x=pad.left+i*gap+gap/2;
     ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,H-pad.bottom);ctx.stroke();
     const t=candles[i].time?new Date(candles[i].time):null;
-    if(t){ctx.fillStyle="rgba(100,116,139,0.9)";ctx.font="8px 'JetBrains Mono'";ctx.fillText(t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),x-14,H-pad.bottom+12);}
+    if(t){ctx.fillStyle="rgba(180,180,180,0.8)";ctx.font="8px 'JetBrains Mono'";ctx.fillText(t.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),x-14,H-pad.bottom+12);}
   }
 
   // Volume bars (subtle)
@@ -928,7 +927,7 @@ function drawCandles(candles) {
     candles.forEach((c,i)=>{
       const x=pad.left+i*gap;const isBull=c.close>=c.open;
       const vh=(c.volume/maxVol)*volH;
-      ctx.fillStyle=isBull?"rgba(16,185,129,0.3)":"rgba(244,63,94,0.3)";
+      ctx.fillStyle=isBull?"rgba(38,166,154,0.25)":"rgba(239,83,80,0.25)";
       ctx.fillRect(x+1,H-pad.bottom-vh,Math.max(1,cw-1),vh);
     });
   }
@@ -946,8 +945,8 @@ function drawCandles(candles) {
     const ema9arr = calcEMA(closes, 9);
     const ema21arr = calcEMA(closes, 21);
     // Dibujar EMA9 (verde)
-    ctx.shadowColor='rgba(0,255,136,0.8)';ctx.shadowBlur=8;
-    ctx.strokeStyle="rgba(0,255,136,0.9)";ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=1.2;ctx.setLineDash([]);
     ctx.beginPath();
     ema9arr.forEach((v,i)=>{
       if(v<lo||v>hi)return;
@@ -956,8 +955,8 @@ function drawCandles(candles) {
     });
     ctx.stroke();
     // Dibujar EMA21 (naranja)
-    ctx.shadowColor='rgba(251,146,60,0.8)';ctx.shadowBlur=8;
-    ctx.strokeStyle="rgba(251,146,60,0.9)";ctx.lineWidth=1.5;
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#ffff00';ctx.lineWidth=1.2;
     ctx.beginPath();
     ema21arr.forEach((v,i)=>{
       if(v<lo||v>hi)return;
@@ -969,9 +968,9 @@ function drawCandles(candles) {
     const lastX=W-pad.right-2;
     ctx.font="bold 8px 'JetBrains Mono'";
     ctx.shadowBlur=0;
-    ctx.fillStyle="rgba(0,255,136,0.9)";
+    ctx.fillStyle="#ffffff";
     ctx.fillText("EMA9", lastX-28, toY(ema9arr[ema9arr.length-1])-3);
-    ctx.fillStyle="rgba(251,146,60,0.9)";
+    ctx.fillStyle="#ffff00";
     ctx.fillText("EMA21", lastX-32, toY(ema21arr[ema21arr.length-1])+10);
   }
 
@@ -982,38 +981,26 @@ function drawCandles(candles) {
     const o=toY(c.open),cl=toY(c.close);
     const hi_y=toY(c.high),lo_y=toY(c.low);
     const isBull=c.close>=c.open;
-    const colU="#26a69a",colD="#ef5350",colUG="#00ffaa",colDG="#ff4466";
+    const colU="#26a69a",colD="#ef5350",colUG="#26a69a",colDG="#ef5350";
     const bodyT=Math.min(o,cl),bodyH=Math.max(1,Math.abs(cl-o));
-    // Mecha
-    // Mecha con glow
-    ctx.shadowColor = isBull ? colUG : colDG;
-    ctx.shadowBlur = 2;
-    ctx.strokeStyle=isBull?colU:colD;ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(cx,hi_y);ctx.lineTo(cx,lo_y);ctx.stroke();
+    // Mecha — estilo MT5 limpio
     ctx.shadowBlur = 0;
-    // Cuerpo con gradiente
-    const grad = ctx.createLinearGradient(x, bodyT, x, bodyT+bodyH);
-    if(isBull){
-      grad.addColorStop(0, '#2dd4a0');
-      grad.addColorStop(1, '#1a7a72');
-    } else {
-      grad.addColorStop(0, '#ef5350');
-      grad.addColorStop(1, '#b03030');
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(x+1,bodyT,Math.max(1,cw-1),bodyH);
-    // Borde nítido
-    ctx.strokeStyle=isBull?"rgba(0,255,160,0.4)":"rgba(255,60,60,0.4)";ctx.lineWidth=0.5;
-    ctx.strokeRect(x+1,bodyT,Math.max(1,cw-1),bodyH);
+    ctx.strokeStyle = isBull ? colU : colD;
+    ctx.lineWidth = 1;
+    ctx.beginPath();ctx.moveTo(cx,hi_y);ctx.lineTo(cx,lo_y);ctx.stroke();
+    // Cuerpo sólido MT5
+    ctx.fillStyle = isBull ? colU : colD;
+    ctx.fillRect(x+1, bodyT, Math.max(1,cw-1), bodyH);
+    // Sin borde extra — más limpio
   });
 
   // Current price line
   const last=candles[candles.length-1].close;
   const pY=toY(last);
-  ctx.shadowColor='rgba(59,130,246,0.6)';ctx.shadowBlur=6;
-  ctx.strokeStyle="rgba(59,130,246,0.8)";ctx.lineWidth=1;ctx.setLineDash([5,3]);
-  ctx.beginPath();ctx.moveTo(pad.left,pY);ctx.lineTo(W-pad.right,pY);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle="#3b82f6";ctx.fillRect(W-pad.right,pY-8,pad.right,16);
+  ctx.shadowBlur=0;
+  ctx.strokeStyle="rgba(150,150,150,0.5)";ctx.lineWidth=0.5;ctx.setLineDash([2,6]);
+  ctx.beginPath();ctx.moveTo(W-pad.right-80,pY);ctx.lineTo(W-pad.right,pY);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#00aaff";ctx.fillRect(W-pad.right,pY-8,pad.right,16);
   ctx.fillStyle="#fff";ctx.font="bold 8px 'JetBrains Mono'";
   ctx.fillText(last.toLocaleString(undefined,{maximumFractionDigits:2}),W-pad.right+3,pY+3);
 
@@ -1034,17 +1021,20 @@ function drawCandles(candles) {
 
 function drawLevels(ov,W,H,pad,lo,hi,cH,toY){
   const ctx=ov.getContext("2d");ctx.clearRect(0,0,W,H);
+  // Solo mostrar SL y TP con líneas finas grises estilo MT5
+  // Solo mostrar SL/TP si hay señal activa
   const drawLine=(price,color,label)=>{
     if(!price||price<lo||price>hi)return;
     const y=toY(price);
-    ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.setLineDash([6,3]);
-    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle=color;ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(W-pad.right-60,y);ctx.lineTo(W-pad.right,y);ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle=color;ctx.fillRect(W-pad.right,y-7,pad.right,14);
     ctx.fillStyle="#000";ctx.font="bold 8px 'JetBrains Mono'";ctx.fillText(label,W-pad.right+3,y+3);
   };
-  drawLine(S.slP,"rgba(244,63,94,0.9)","SL");
-  drawLine(S.trailP,"rgba(6,182,212,0.9)","TSL");
-  drawLine(S.tpP,"rgba(16,185,129,0.9)","TP");
+  if(S.slP && S.tpP) {
+    drawLine(S.slP,"rgba(239,68,68,0.85)","SL");
+    drawLine(S.tpP,"rgba(16,185,129,0.85)","TP");
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1079,9 +1069,8 @@ function drawSessionOverlay(candles, ctx, W, H, pad, lo, hi, cH, toY) {
       const t=candles[i].time?new Date(candles[i].time):null; if(!t)continue;
       if(t.getUTCHours()===sess.start){
         const x=pad.left+i*(cW/n);
-        ctx.fillStyle=sess.border; ctx.fillRect(x,pad.top,1,cH);
-        ctx.fillStyle=sess.border.replace('0.4)','0.9)');
-        ctx.fillText(sess.label,x+3,pad.top+10); break;
+        // sesión border oculto
+        break;
       }
     }
   });
@@ -1106,20 +1095,24 @@ function drawLiquidityHeatmap(candles, ctx, W, H, pad, lo, hi, cH, toY) {
   cluster(highs).forEach(g=>{
     if(g.price<lo||g.price>hi)return;
     const y=toY(g.price), a=Math.min(0.8,0.3+g.count*0.15);
-    ctx.strokeStyle=`rgba(244,63,94,${a})`;ctx.lineWidth=1;ctx.setLineDash([2,6]);
-    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    // BSL — solo etiqueta en el lado derecho, sin línea completa
     ctx.setLineDash([]);ctx.fillStyle=`rgba(244,63,94,${a})`;
-    ctx.font='bold 6px JetBrains Mono,monospace';
-    ctx.fillText('BSL'+(g.count>1?' 🔥':''),W-pad.right-32,y-2);
+    ctx.font='bold 7px JetBrains Mono,monospace';
+    ctx.fillText('BSL',W-pad.right+2,y-2);
+    ctx.strokeStyle=`rgba(244,63,94,${a*0.4})`;ctx.lineWidth=0.5;ctx.setLineDash([1,8]);
+    ctx.beginPath();ctx.moveTo(W-pad.right-40,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    ctx.setLineDash([]);
   });
   cluster(lows).forEach(g=>{
     if(g.price<lo||g.price>hi)return;
     const y=toY(g.price), a=Math.min(0.8,0.3+g.count*0.15);
-    ctx.strokeStyle=`rgba(16,185,129,${a})`;ctx.lineWidth=1;ctx.setLineDash([2,6]);
-    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    // SSL — solo etiqueta en el lado derecho, sin línea completa
     ctx.setLineDash([]);ctx.fillStyle=`rgba(16,185,129,${a})`;
-    ctx.font='bold 6px JetBrains Mono,monospace';
-    ctx.fillText('SSL'+(g.count>1?' 🔥':''),W-pad.right-32,y+8);
+    ctx.font='bold 7px JetBrains Mono,monospace';
+    ctx.fillText('SSL',W-pad.right+2,y+8);
+    ctx.strokeStyle=`rgba(16,185,129,${a*0.4})`;ctx.lineWidth=0.5;ctx.setLineDash([1,8]);
+    ctx.beginPath();ctx.moveTo(W-pad.right-40,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+    ctx.setLineDash([]);
   });
 }
 
