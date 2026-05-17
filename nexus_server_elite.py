@@ -581,10 +581,12 @@ class MLScorer:
         else:                       scores["macd"] = 35
 
         ema9 = ind.get("ema9",0); ema21 = ind.get("ema21",0); ema50 = ind.get("ema50",0)
-        if ema9>ema21>ema50:   scores["ema_cross"] = 85
-        elif ema9>ema21:       scores["ema_cross"] = 65
-        elif ema9<ema21<ema50: scores["ema_cross"] = 15
-        else:                  scores["ema_cross"] = 35
+        # EMA cross — señal principal para scalping
+        if ema9>ema21 and ema9>ema21*1.0002:   scores["ema_cross"] = 90  # Cruz alcista fuerte
+        elif ema9>ema21:                        scores["ema_cross"] = 70  # Cruz alcista
+        elif ema9<ema21 and ema9<ema21*0.9998: scores["ema_cross"] = 10  # Cruz bajista fuerte
+        elif ema9<ema21:                        scores["ema_cross"] = 30  # Cruz bajista
+        else:                                   scores["ema_cross"] = 50
 
         bbp = ind.get("bb",{}).get("pos",50)
         if bbp<20:   scores["bb_pos"] = 85
@@ -636,9 +638,23 @@ class MLScorer:
         vol_v = ind.get("vol", {}).get("ratio", 1)
         buy_conf = int(rsi_v<35) + int(macd_v.get("hist",0)>0) + int(ema9_v>ema21_v and ema21_v>ema50_v) + int(stoch_v<25) + int(vol_v>1.2)
         sell_conf = int(rsi_v>65) + int(macd_v.get("hist",0)<0) + int(ema9_v<ema21_v and ema21_v<ema50_v) + int(stoch_v>75) + int(vol_v>1.2)
-        if buy_conf>=3 or total>=62:   signal, conf = "BUY",  round(min(95, max(total, 60+buy_conf*5)))
-        elif sell_conf>=3 or total<=38: signal, conf = "SELL", round(min(95, max(100-total, 60+sell_conf*5)))
-        else:                           signal, conf = "WAIT", round(50)
+        # Para scalping: EMA cross + volumen son obligatorios
+        ema_bull = ema9 > ema21
+        ema_bear = ema9 < ema21
+        vol_ratio = ind.get("vol",{}).get("ratio",1.0)
+        buy_pct   = ind.get("vol",{}).get("buy_pct",50)
+        vol_ok    = vol_ratio >= 1.2
+
+        if buy_conf>=3 and ema_bull and vol_ok:
+            signal, conf = "BUY",  round(min(95, max(total, 60+buy_conf*5)))
+        elif sell_conf>=3 and ema_bear and vol_ok:
+            signal, conf = "SELL", round(min(95, max(100-total, 60+sell_conf*5)))
+        elif buy_conf>=4 or total>=68:
+            signal, conf = "BUY",  round(min(90, total))
+        elif sell_conf>=4 or total<=32:
+            signal, conf = "SELL", round(min(90, 100-total))
+        else:
+            signal, conf = "WAIT", round(50)
 
         return {
             "signal":     signal,
