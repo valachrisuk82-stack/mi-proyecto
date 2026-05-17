@@ -2441,6 +2441,219 @@ def payment_notify():
     except Exception as e:
         return jsonify({"ok":False,"error":str(e)})
 
+
+# ══════════════════════════════════════════════════════════════════
+#  SEÑAL DUAL TIMEFRAME M1+H1 — ORO Y BITCOIN
+# ══════════════════════════════════════════════════════════════════
+_dual_signal_cache = {}
+_dual_signal_time  = {}
+
+def get_dual_tf_signal(pair):
+    """
+    Genera señal usando M1 (entrada) + H1 (dirección)
+    Solo señal cuando AMBOS timeframes coinciden
+    """
+    import time as _t
+    now = _t.time()
+    if pair in _dual_signal_cache and now - _dual_signal_time.get(pair,0) < 60:
+        return _dual_signal_cache[pair]
+
+    try:
+        # Obtener datos via API interno (funciona para crypto Y externos)
+        port = int(os.environ.get("PORT", 5001))
+        base_url = f"http://localhost:{port}/api"
+
+        def fetch_klines_internal(sym, tf, limit=50):
+            try:
+                r = requests.get(f"{base_url}/klines/{sym}",
+                    params={"tf": tf, "limit": limit}, timeout=8)
+                data = r.json()
+                if not data: return pd.DataFrame()
+                df = pd.DataFrame(data)
+                df["close"] = df["close"].astype(float)
+                df["open"]  = df["open"].astype(float)
+                df["high"]  = df["high"].astype(float)
+                df["low"]   = df["low"].astype(float)
+                df["volume"]= df["volume"].astype(float)
+                return df
+            except: return pd.DataFrame()
+
+        df_m1 = fetch_klines_internal(pair, "1m", 50)
+        df_h1 = fetch_klines_internal(pair, "1h", 50)
+
+        if df_m1.empty or len(df_m1) < 22:
+            return {"signal":"WAIT","confidence":0,"reason":f"Sin datos M1 para {pair}",
+                    "m1_trend":"--","h1_trend":"--","aligned":False,"cross_detected":False,
+                    "entry":0,"sl":0,"tp":0,"rr":0}
+        if df_h1.empty or len(df_h1) < 22:
+            return {"signal":"WAIT","confidence":0,"reason":f"Sin datos H1 para {pair}",
+                    "m1_trend":"--","h1_trend":"--","aligned":False,"cross_detected":False,
+                    "entry":0,"sl":0,"tp":0,"rr":0}
+
+        # ── Calcular EMAs ──
+        def ema(series, period):
+            return series.ewm(span=period, adjust=False).mean()
+
+        # M1 — señal de entrada
+        m1_ema9  = ema(df_m1["close"], 9)
+        m1_ema21 = ema(df_m1["close"], 21)
+        m1_last  = m1_ema9.iloc[-1]
+        m1_prev  = m1_ema9.iloc[-2]
+        m1_21    = m1_ema21.iloc[-1]
+        m1_21p   = m1_ema21.iloc[-2]
+
+        # Detectar cruce en M1
+        m1_cross_bull = m1_prev <= m1_21p and m1_last > m1_21  # EMA9 cruzó arriba
+        m1_cross_bear = m1_prev >= m1_21p and m1_last < m1_21  # EMA9 cruzó abajo
+        m1_bull = m1_last > m1_21  # EMA9 sobre EMA21
+        m1_bear = m1_last < m1_21  # EMA9 bajo EMA21
+
+        # H1 — dirección principal
+        h1_ema9  = ema(df_h1["close"], 9).iloc[-1]
+        h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
+        h1_bull  = h1_ema9 > h1_ema21
+        h1_bear  = h1_ema9 < h1_ema21
+
+        # Volumen M1
+        vol_avg = df_m1["volume"].rolling(20).mean().iloc[-1]
+        vol_cur = df_m1["volume"].iloc[-1]
+        vol_ratio = vol_cur / vol_avg if vol_avg > 0 else 1
+
+        # ATR para SL/TP
+        atr = calc_atr(df_m1)
+        price = float(df_m1["close"].iloc[-1])
+
+        # RSI M1
+        rsi = calc_rsi(df_m1)
+
+        # ── LÓGICA DE SEÑAL ──
+        signal = "WAIT"
+        confidence = 0
+        reason = ""
+
+        # BUY: H1 alcista + M1 cruce alcista o ya alcista
+        if h1_bull and m1_bull and rsi < 70:
+            if m1_cross_bull and vol_ratio >= 1.2:
+                signal = "BUY"
+                confidence = 90
+                reason = f"✅ CRUCE EMA M1 ALCISTA confirmado por H1. Vol {vol_ratio:.1f}x. RSI {rsi:.0f}"
+            elif m1_bull and vol_ratio >= 1.3:
+                signal = "BUY"
+                confidence = 75
+                reason = f"📈 EMA M1 alcista + H1 alcista. Vol alto {vol_ratio:.1f}x"
+            elif m1_bull:
+                signal = "BUY"
+                confidence = 60
+                reason = f"📈 EMA M1 alcista + H1 confirma. Esperar volumen"
+
+        # SELL: H1 bajista + M1 cruce bajista o ya bajista
+        elif h1_bear and m1_bear and rsi > 30:
+            if m1_cross_bear and vol_ratio >= 1.2:
+                signal = "SELL"
+                confidence = 90
+                reason = f"✅ CRUCE EMA M1 BAJISTA confirmado por H1. Vol {vol_ratio:.1f}x. RSI {rsi:.0f}"
+            elif m1_bear and vol_ratio >= 1.3:
+                signal = "SELL"
+                confidence = 75
+                reason = f"📉 EMA M1 bajista + H1 bajista. Vol alto {vol_ratio:.1f}x"
+            elif m1_bear:
+                signal = "SELL"
+                confidence = 60
+                reason = f"📉 EMA M1 bajista + H1 confirma. Esperar volumen"
+
+        # Divergencia — timeframes opuestos
+        elif h1_bull and m1_bear:
+            signal = "WAIT"
+            confidence = 0
+            reason = "⚠️ H1 alcista pero M1 bajista — esperar alineación"
+        elif h1_bear and m1_bull:
+            signal = "WAIT"
+            confidence = 0
+            reason = "⚠️ H1 bajista pero M1 alcista — posible retroceso"
+
+        # SL y TP basados en ATR
+        if signal == "BUY":
+            sl = round(price - atr * 1.5, 4)
+            tp = round(price + atr * 3.0, 4)
+        elif signal == "SELL":
+            sl = round(price + atr * 1.5, 4)
+            tp = round(price - atr * 3.0, 4)
+        else:
+            sl = round(price - atr * 1.5, 4)
+            tp = round(price + atr * 3.0, 4)
+
+        rr = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
+
+        result = {
+            "pair": pair,
+            "signal": signal,
+            "confidence": confidence,
+            "entry": round(price, 4),
+            "sl": sl,
+            "tp": tp,
+            "rr": rr,
+            "atr": round(atr, 4),
+            "rsi_m1": round(rsi, 1),
+            "vol_ratio": round(vol_ratio, 2),
+            "m1_trend": "ALCISTA" if m1_bull else "BAJISTA",
+            "h1_trend": "ALCISTA" if h1_bull else "BAJISTA",
+            "aligned": (h1_bull and m1_bull) or (h1_bear and m1_bear),
+            "cross_detected": m1_cross_bull or m1_cross_bear,
+            "reason": reason
+        }
+
+        _dual_signal_cache[pair] = result
+        _dual_signal_time[pair]  = now
+
+        # Alertar en Telegram si hay señal fuerte
+        if signal != "WAIT" and confidence >= 75:
+            prev = _dual_signal_cache.get(pair+"_prev", {})
+            if prev.get("signal") != signal:
+                emoji = "🟢" if signal=="BUY" else "🔴"
+                msg = (
+                    f"{emoji} <b>NEXUS APEX — {signal} {pair}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Entry:  <b>${price:,.4f}</b>\n"
+                    f"🛑 SL:     <b>${sl:,.4f}</b>\n"
+                    f"🎯 TP:     <b>${tp:,.4f}</b>\n"
+                    f"📐 R:R     <b>1:{rr}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📊 M1: {result['m1_trend']} | H1: {result['h1_trend']}\n"
+                    f"📈 Vol: {vol_ratio:.1f}x | RSI: {rsi:.0f}\n"
+                    f"🧠 {reason}\n"
+                    f"⚡ NEXUS APEX"
+                )
+                send_telegram(msg)
+                _dual_signal_cache[pair+"_prev"] = result
+
+        return result
+
+    except Exception as e:
+        return {"signal":"WAIT","confidence":0,"reason":f"Error: {e}",
+                "m1_trend":"--","h1_trend":"--","aligned":False,"cross_detected":False,
+                "entry":0,"sl":0,"tp":0,"rr":0}
+
+@app.route("/api/dual_signal/<symbol>")
+def dual_signal_api(symbol):
+    try:
+        result = get_dual_tf_signal(symbol.upper())
+        if result is None:
+            return jsonify({"ok": False, "result": None})
+        # Serializar correctamente valores numpy
+        clean = {}
+        for k, v in result.items():
+            if hasattr(v, "item"):  # numpy scalar
+                clean[k] = v.item()
+            elif isinstance(v, bool):
+                clean[k] = bool(v)
+            elif isinstance(v, float):
+                clean[k] = round(float(v), 4)
+            else:
+                clean[k] = v
+        return jsonify({"ok": True, "result": clean})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 @app.route("/api/categories")
 def categories():
     return jsonify({"CRYPTO": list(cache["tickers"].keys()), "FOREX": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="FOREX"], "COMMODITIES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="COMMODITIES"], "INDICES": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="INDICES"], "STOCKS": [k for k,v in ALL_EXTERNAL.items() if v["cat"]=="STOCKS"]})
