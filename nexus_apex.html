@@ -348,6 +348,23 @@ canvas{position:absolute;top:0;left:0}
 
     <!-- CHART -->
     <div class="chart-wrap" id="chartWrap">
+  <!-- Widget señal dual M1+H1 -->
+  <div id="dualSignalWidget" style="position:absolute;top:8px;left:8px;z-index:10;display:flex;flex-direction:column;gap:4px;pointer-events:none">
+    <div id="dsWidgetBTC" style="background:rgba(2,3,10,0.88);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:5px 8px;font-family:JetBrains Mono,monospace;min-width:130px">
+      <div style="font-size:7px;letter-spacing:1px;color:#475569;margin-bottom:2px">BTC M1+H1</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span id="dsBTCsig" style="font-size:11px;font-weight:800;color:#64748b">--</span>
+        <span id="dsBTCtrend" style="font-size:8px;color:#475569">--</span>
+      </div>
+    </div>
+    <div id="dsWidgetXAU" style="background:rgba(2,3,10,0.88);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:5px 8px;font-family:JetBrains Mono,monospace;min-width:130px">
+      <div style="font-size:7px;letter-spacing:1px;color:#475569;margin-bottom:2px">GOLD M1+H1</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span id="dsXAUsig" style="font-size:11px;font-weight:800;color:#64748b">--</span>
+        <span id="dsXAUtrend" style="font-size:8px;color:#475569">--</span>
+      </div>
+    </div>
+  </div>
       <canvas id="candleCanvas"></canvas>
   <div style="position:absolute;top:36px;right:78px;display:flex;gap:4px;z-index:10">
 
@@ -1321,6 +1338,37 @@ function renderSMCScanPanel(history, lastScan) {
 
 setTimeout(() => runSMCScan(), 3000);
 setInterval(() => runSMCScan(), 300000);
+
+
+// ── DUAL SIGNAL WIDGET M1+H1 ──
+async function loadDualSignals() {
+  const pairs = [
+    {sym:'BTCUSDT', sigEl:'dsBTCsig', trendEl:'dsBTCtrend', widgetEl:'dsWidgetBTC'},
+    {sym:'XAUUSD',  sigEl:'dsXAUsig', trendEl:'dsXAUtrend', widgetEl:'dsWidgetXAU'}
+  ];
+  for (const p of pairs) {
+    try {
+      const r = await fetch(`${API_BASE}/dual_signal/${p.sym}`);
+      const d = await r.json();
+      if (!d.ok || !d.result) continue;
+      const res = d.result;
+      const sig = res.signal;
+      const color = sig==='BUY'?'#00ff88':sig==='SELL'?'#ef4444':'#64748b';
+      const borderColor = sig==='BUY'?'rgba(0,255,136,0.3)':sig==='SELL'?'rgba(239,68,68,0.3)':'rgba(255,255,255,0.08)';
+      const aligned = res.aligned ? '✓' : '⚠';
+      const trend = `${res.m1_trend?.slice(0,3)}/${res.h1_trend?.slice(0,3)}`;
+      const sigEl = document.getElementById(p.sigEl);
+      const trendEl = document.getElementById(p.trendEl);
+      const widgetEl = document.getElementById(p.widgetEl);
+      if (sigEl) { sigEl.textContent = sig; sigEl.style.color = color; }
+      if (trendEl) { trendEl.textContent = `${aligned} ${trend}`; trendEl.style.color = res.aligned ? color : '#f59e0b'; }
+      if (widgetEl) widgetEl.style.borderColor = borderColor;
+    } catch(e) {}
+  }
+}
+
+loadDualSignals();
+setInterval(loadDualSignals, 60000);
 
 // ── SMC AUTO-SIGNAL ──
 function checkSMCSignal(candles) {
