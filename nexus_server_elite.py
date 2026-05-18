@@ -1111,14 +1111,34 @@ JSON:
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=350,
+        max_tokens=800,
         messages=[{"role":"user","content":prompt}]
     )
     raw   = response.content[0].text.strip()
-    clean = raw.replace("```json","").replace("```","").strip()
+    # Limpiar formato markdown
+    clean = raw.replace("```json","").replace("```","").replace("\n","\n").strip()
+    # Buscar JSON en la respuesta
     match = re.search(r"\{[\s\S]*\}", clean)
-    if not match: raise ValueError("No JSON")
-    result = json.loads(match.group())
+    if not match:
+        # Intentar extraer JSON de otra forma
+        try:
+            result = json.loads(clean)
+        except:
+            print(f"[DEBUG] Respuesta Claude: {raw[:200]}")
+            raise ValueError("No JSON en respuesta")
+    else:
+        try:
+            result = json.loads(match.group())
+        except json.JSONDecodeError as je:
+            # Intentar reparar JSON truncado
+            partial = match.group()
+            # Añadir cierre si falta
+            if partial.count("{") > partial.count("}"):
+                partial += "}"
+            try:
+                result = json.loads(partial)
+            except:
+                raise ValueError(f"JSON inválido: {je}")
 
     # Calculate trailing stop
     price_now = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
