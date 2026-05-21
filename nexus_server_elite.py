@@ -793,6 +793,23 @@ ml_scorer = MLScorer()
 # ══════════════════════════════════════════════════════════════════
 #  TRAILING STOP
 # ══════════════════════════════════════════════════════════════════
+
+def get_atr_multipliers(pair):
+    """Multiplicadores SL/TP según el activo — calibrados para M1"""
+    pair = pair.upper()
+    if pair in ["XAUUSD", "XAGUSD"]:          # Oro/Plata — ATR grande
+        return 2.0, 4.0   # SL=2xATR, TP=4xATR
+    elif pair in ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURGBP"]:
+        return 1.5, 3.0   # Forex estándar
+    elif pair in ["BTCUSDT","ETHUSDT"]:        # Crypto mayor
+        return 1.5, 3.0
+    elif pair.endswith("USDT"):                # Crypto menor — más volátil
+        return 1.2, 2.5
+    elif pair in ["SPX500","NAS100","DOW30"]:  # Índices
+        return 1.5, 3.0
+    else:
+        return 1.5, 3.0
+
 def calc_trailing_stop(signal, entry, current_price, atr):
     """Calcula trailing stop dinámico basado en ATR"""
     mult = CONFIG["trailing_atr_mult"]
@@ -889,13 +906,18 @@ def update_all():
 
             sig  = ml["signal"]
             conf = ml["confidence"]
+            # Solo alertar para pares seleccionados
+            ALERT_PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","XAUUSD","GBPUSD","EURUSD"]
+            if pair not in ALERT_PAIRS:
+                continue
             prev = cache["last_alerts"].get(pair,{}).get("signal")
 
             if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
                 price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
                 atr   = ind.get("atr", price*0.012)
-                sl    = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-                tp    = price + atr*3   if sig=="BUY" else price - atr*3
+                sl_mult, tp_mult = get_atr_multipliers(pair)
+                sl    = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
+                tp    = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
                 trail = calc_trailing_stop(sig, price, price, atr)
                 msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
                 send_telegram(msg)
@@ -934,6 +956,40 @@ def update_all():
             # Limpiar alertas viejas (>2h)
             cache["sr_alerts"] = {k:v for k,v in prev_alerts.items() if (datetime.now()-v).seconds < 7200}
         except: pass
+    # ── Alertas para activos externos (ORO, FOREX) ──
+    EXT_ALERT_PAIRS = ["XAUUSD", "GBPUSD", "EURUSD"]
+    for pair in EXT_ALERT_PAIRS:
+        try:
+            if pair not in ALL_EXTERNAL: continue
+            yf_ticker = ALL_EXTERNAL[pair]["ticker"]
+            df = get_yahoo_klines_simple(yf_ticker, "5m")
+            if df is None or df.empty or len(df) < 30: continue
+            ind = calc_all_indicators(df)
+            if not ind: continue
+            price = float(df["close"].iloc[-1])
+            atr   = ind.get("atr", price*0.001)
+            ml    = ml_scorer.score(ind, {})
+            sig   = ml["signal"]
+            conf  = ml["confidence"]
+            if sig == "WAIT": continue
+            prev = cache["last_alerts"].get(pair, {}).get("signal")
+            if prev == sig: continue
+            sl_mult, tp_mult = get_atr_multipliers(pair)
+            sl = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
+            tp = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
+            rr = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
+            emoji = "🟢" if sig=="BUY" else "🔴"
+            msg = tg_alert(pair, sig, conf, price, sl, tp, rr, sl, f"EMA 9/21 cross confirmado", ml["ml_score"], 0)
+            send_telegram(msg)
+            cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
+            cache["history"].insert(0, {
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "pair": pair, "signal": sig, "confidence": conf,
+                "price": round(price,4), "ml_score": ml["ml_score"], "source": "AUTO"
+            })
+        except Exception as e:
+            pass
+
     cache["last_update"] = datetime.now().strftime("%H:%M:%S")
     cache["updating"] = False
     print(f"[OK] Elite update complete — {cache['last_update']}")
@@ -1008,8 +1064,9 @@ def analyze_local(pair):
     atr    = ind.get("atr", price*0.012)
     sig    = ml.get("signal","WAIT")
     conf   = ml.get("confidence",50)
-    sl     = price - atr*1.5 if sig=="BUY" else price + atr*1.5
-    tp     = price + atr*3   if sig=="BUY" else price - atr*3
+    sl_mult, tp_mult = get_atr_multipliers(pair)
+    sl     = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
+    tp     = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
     trail  = calc_trailing_stop(sig, price, price, atr)
     capital= CONFIG["capital"]; risk=CONFIG["risk_pct"]
     lot    = (capital*risk/100)/max(abs(price-sl),0.0001)
