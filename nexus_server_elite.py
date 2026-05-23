@@ -216,23 +216,24 @@ def get_user_plan(token):
 
 def tg_alert(pair, signal, conf, entry, sl, tp, rr, trail_sl, reasoning, ml_score, news_sent):
     emoji = "🟢" if signal == "BUY" else "🔴"
-    sent_emoji = "😊" if news_sent > 0 else "😰" if news_sent < 0 else "😐"
-    return f"""
-{emoji} <b>NEXUS PRO ELITE — {signal}</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Par: <b>{pair}</b>
-💰 Entrada: <b>${entry:,.4f}</b>
-🛑 Stop Loss: <b>${sl:,.4f}</b>
-🔄 Trailing SL: <b>${trail_sl:,.4f}</b>
-🎯 Take Profit: <b>${tp:,.4f}</b>
-⚖️ R:R: <b>1:{rr}</b>
-🤖 Confianza IA: <b>{conf}%</b>
-🧠 Score ML: <b>{ml_score}/100</b>
-{sent_emoji} Sentimiento: <b>{'POSITIVO' if news_sent > 0 else 'NEGATIVO' if news_sent < 0 else 'NEUTRAL'}</b>
-━━━━━━━━━━━━━━━━━━━━━━━━
+    # Formatear precio según el activo
+    if pair in ["XAUUSD","XAGUSD"] or "USD" in pair and "USDT" not in pair:
+        fmt = lambda x: f"${x:,.2f}"
+    elif "USDT" in pair and entry > 100:
+        fmt = lambda x: f"${x:,.2f}"
+    else:
+        fmt = lambda x: f"${x:,.4f}"
+    return f"""{emoji} <b>NEXUS APEX — {signal} {pair}</b>
+━━━━━━━━━━━━━━━━━━━━
+💰 Entrada:  <b>{fmt(entry)}</b>
+🛑 Stop Loss: <b>{fmt(sl)}</b>
+🎯 Take Profit: <b>{fmt(tp)}</b>
+📐 R:R: <b>1:{rr}</b>
+━━━━━━━━━━━━━━━━━━━━
+🤖 Confianza: <b>{conf}%</b> | ML: <b>{ml_score}/100</b>
 💬 {reasoning}
-🕐 {datetime.now().strftime('%H:%M:%S')} London
-"""
+🕐 {datetime.now().strftime('%H:%M')} Londres
+⚡ NEXUS APEX"""
 
 # ══════════════════════════════════════════════════════════════════
 #  BINANCE API
@@ -983,7 +984,8 @@ def update_all():
             tp = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
             rr = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
             emoji = "🟢" if sig=="BUY" else "🔴"
-            msg = tg_alert(pair, sig, conf, price, sl, tp, rr, sl, f"EMA 9/21 cross confirmado", ml["ml_score"], 0)
+            rr_real = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
+            msg = tg_alert(pair, sig, conf, price, sl, tp, rr_real, sl, f"EMA 9/21 M1+H1 alineados", ml["ml_score"], 0)
             send_telegram(msg)
             cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
             cache["history"].insert(0, {
