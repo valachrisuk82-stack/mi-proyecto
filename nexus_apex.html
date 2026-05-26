@@ -1048,7 +1048,7 @@ function drawLevels(ov,W,H,pad,lo,hi,cH,toY){
     ctx.fillStyle=color;ctx.fillRect(W-pad.right,y-7,pad.right,14);
     ctx.fillStyle="#000";ctx.font="bold 8px 'JetBrains Mono'";ctx.fillText(label,W-pad.right+3,y+3);
   };
-  if(S.slP && S.tpP) {
+  if(S.slP && S.tpP && S.currentSignal && S.currentSignal!=="WAIT") {
     drawLine(S.slP,"rgba(239,68,68,0.85)","SL");
     drawLine(S.tpP,"rgba(16,185,129,0.85)","TP");
   }
@@ -1687,14 +1687,37 @@ function localAI(pair){
   const conf = Math.round(55+Math.abs(score)*7);
   const sig = (score>=2&&mtfBull)?"BUY":(score<=-2&&mtfBear)?"SELL":score>=3?"BUY":score<=-3?"SELL":"WAIT";
   const dir=sig==="SELL"?"SELL":"BUY";
-  const sl=S.sigs[pair]?.sl||(dir==="BUY"?price-atr*1.5:price+atr*1.5);
-  const tp=S.sigs[pair]?.tp||(dir==="BUY"?price+atr*3:price-atr*3);
-  const trail=dir==="BUY"?price-atr*2:price+atr*2;
-  const cap=parseFloat(document.getElementById("inpCap").value)||1000;
-  const risk=parseFloat(document.getElementById("inpRisk").value)||1;
-  const lot=(cap*risk/100)/Math.abs(price-sl)||0;
+  // SL basado en swing reciente — más preciso que ATR puro
+  const candles = S.candles || [];
+  const lookback = Math.min(20, candles.length);
+  const recentCandles = candles.slice(-lookback);
+  const swingLow  = recentCandles.length ? Math.min(...recentCandles.map(c=>c.low))  : price - atr;
+  const swingHigh = recentCandles.length ? Math.max(...recentCandles.map(c=>c.high)) : price + atr;
+  // SL justo debajo/arriba del swing + pequeño buffer
+  const slBuf = atr * 0.3;
+  const isGold  = pair.includes("XAU");
+  const isForex = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF"].includes(pair);
+  let sl, tp;
+  if(S.sigs[pair]?.sl && S.sigs[pair]?.tp) {
+    sl = S.sigs[pair].sl;
+    tp = S.sigs[pair].tp;
+  } else {
+    sl = dir==="BUY" ? swingLow - slBuf  : swingHigh + slBuf;
+    const slDist0 = Math.abs(price - sl);
+    const tpMult  = isGold ? 4.0 : isForex ? 3.0 : 2.5;
+    tp = dir==="BUY" ? price + slDist0*tpMult : price - slDist0*tpMult;
+  }
+  // Trail SL — en dirección correcta
+  const trail = dir==="BUY" ? sl : sl;
+  // R:R real
+  const slDist = Math.abs(price-sl);
+  const rrCalc = slDist > 0 ? Math.abs(tp-price)/slDist : 2;
+  const cap  = parseFloat(document.getElementById("inpCap").value)||1000;
+  const risk = parseFloat(document.getElementById("inpRisk").value)||1;
+  // Lot size correcto
+  const lot = slDist > 0 ? parseFloat(((cap*risk/100)/slDist).toFixed(4)) : 0;
   const patStr=patterns.length?patterns.map(p=>p.name).join(", "):"Sin patrones";
-  applyResult({signal:sig,confidence:Math.round(55+Math.abs(score)*7),entry:price,sl,tp,trailing_sl:trail,rr:2.0,lot,trend:ema9>ema21?"ALCISTA":"BAJISTA",strength:"MODERADO",reasoning:`RSI ${rsi.toFixed(0)}, MACD ${hist>0?"positivo":"negativo"}. ${patStr}.`,warnings:[],whale_alert:false,news_impact:"NEUTRAL"},pair);
+  applyResult({signal:sig,confidence:Math.round(55+Math.abs(score)*7),entry:price,sl,tp,trailing_sl:trail,rr:parseFloat(rrCalc.toFixed(1)),lot,trend:ema9>ema21?"ALCISTA":"BAJISTA",strength:rrCalc>=2?"FUERTE":rrCalc>=1.5?"MODERADO":"DÉBIL",reasoning:`RSI ${rsi.toFixed(0)}, MACD ${hist>0?"positivo":"negativo"}. ${patStr}.`,warnings:[],whale_alert:false,news_impact:"NEUTRAL"},pair);
 }
 
 function applyResult(r,pair){
@@ -1706,7 +1729,7 @@ function applyResult(r,pair){
   const sig=r.signal||"WAIT",conf=r.confidence||0;
   const sl=r.sl||0,tp=r.tp||0,trail=r.trailing_sl||0,rr=r.rr||2,lot=r.lot||0;
   const price=S.tickers[pair]?.price || r.entry || (S.candles?.length ? S.candles[S.candles.length-1].close : 0);
-  S.slP=sl;S.tpP=tp;S.trailP=trail;
+  S.slP=sl;S.tpP=tp;S.trailP=trail;S.currentSignal=sig;
   drawCandles(S.candles);
 
   document.getElementById("aiBox").className="ai-box "+sig;

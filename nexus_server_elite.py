@@ -484,10 +484,20 @@ def calc_volume_profile(df):
     avg  = df["volume"].rolling(20).mean().iloc[-1]
     cur  = df["volume"].iloc[-1]
     ratio = round(cur/avg, 2) if avg > 0 else 1
-    # Buy vs Sell volume (taker buy base)
-    buy_vol  = df["tb_base"].iloc[-5:].mean() if "tb_base" in df.columns else 0
-    sell_vol = (df["volume"].iloc[-5:] - df["tb_base"].iloc[-5:]).mean() if "tb_base" in df.columns else 0
-    buy_pct  = round(buy_vol/(buy_vol+sell_vol)*100, 1) if (buy_vol+sell_vol) > 0 else 50
+    # Buy vs Sell volume
+    if "tb_base" in df.columns and df["tb_base"].sum() > 0:
+        buy_vol  = df["tb_base"].iloc[-5:].mean()
+        sell_vol = (df["volume"].iloc[-5:] - df["tb_base"].iloc[-5:]).mean()
+        buy_pct  = round(buy_vol/(buy_vol+sell_vol)*100, 1) if (buy_vol+sell_vol) > 0 else 50
+    else:
+        # Para Yahoo Finance — estimar por precio vs open
+        close = df["close"].iloc[-5:]
+        open_ = df["open"].iloc[-5:]
+        bull_bars = (close > open_).sum()
+        buy_pct = round(bull_bars / 5 * 100, 1)
+    # Si volumen actual es 0 pero avg > 0 — mercado con datos parciales
+    if cur == 0 and avg > 0:
+        ratio = 0.5  # volumen bajo pero no cero
     label = "MUY ALTO" if ratio>2 else "ALTO" if ratio>1.3 else "BAJO" if ratio<0.7 else "NORMAL"
     return {"ratio": ratio, "label": label, "buy_pct": buy_pct, "sell_pct": round(100-buy_pct,1)}
 
