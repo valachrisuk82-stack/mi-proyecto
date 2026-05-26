@@ -918,7 +918,7 @@ def update_all():
             sig  = ml["signal"]
             conf = ml["confidence"]
             # Solo alertar para pares seleccionados
-            ALERT_PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","XAUUSD","GBPUSD","EURUSD"]
+            ALERT_PAIRS = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT"]
             if pair not in ALERT_PAIRS:
                 continue
             prev = cache["last_alerts"].get(pair,{}).get("signal")
