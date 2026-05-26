@@ -975,10 +975,12 @@ def update_all():
             yf_ticker = ALL_EXTERNAL[pair]["ticker"]
             df = get_yahoo_klines_simple(yf_ticker, "5m")
             if df is None or df.empty or len(df) < 30: continue
-            # Verificar que el mercado esté abierto (volumen > 0)
-            last_vol = float(df["volume"].iloc[-1]) if "volume" in df.columns else 0
-            if last_vol == 0:
-                continue  # Mercado cerrado
+            # Verificar que el mercado esté abierto — usar promedio últimas 5 velas
+            if "volume" in df.columns:
+                avg_vol = df["volume"].iloc[-5:].mean()
+                if avg_vol == 0:
+                    continue  # Mercado cerrado
+            print(f"  [EXT] {pair}: procesando señal...")
             ind = calc_all_indicators(df)
             if not ind: continue
             price = float(df["close"].iloc[-1])
@@ -986,6 +988,7 @@ def update_all():
             ml    = ml_scorer.score(ind, {})
             sig   = ml["signal"]
             conf  = ml["confidence"]
+            print(f"  [EXT] {pair}: sig={sig} conf={conf} price={price:.4f}")
             if sig == "WAIT": continue
             prev = cache["last_alerts"].get(pair, {}).get("signal")
             if prev == sig: continue
