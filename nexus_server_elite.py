@@ -656,9 +656,11 @@ class MLScorer:
         buy_pct   = ind.get("vol",{}).get("buy_pct",50)
         vol_ok    = vol_ratio >= 1.2
 
-        if buy_conf>=3 and ema_bull and vol_ok:
+        # Para forex/commodities (vol_ratio=0) no requerir volumen
+        vol_ok_strict = vol_ok if not is_forex else True
+        if buy_conf>=3 and ema_bull and vol_ok_strict:
             signal, conf = "BUY",  round(min(95, max(total, 60+buy_conf*5)))
-        elif sell_conf>=3 and ema_bear and vol_ok:
+        elif sell_conf>=3 and ema_bear and vol_ok_strict:
             signal, conf = "SELL", round(min(95, max(100-total, 60+sell_conf*5)))
         elif buy_conf>=4 or total>=68:
             signal, conf = "BUY",  round(min(90, total))
@@ -918,7 +920,7 @@ def update_all():
             sig  = ml["signal"]
             conf = ml["confidence"]
             # Solo alertar para pares seleccionados
-            ALERT_PAIRS = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT"]
+            ALERT_PAIRS = ["BTCUSDT","ADAUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
             if pair not in ALERT_PAIRS:
                 continue
             prev = cache["last_alerts"].get(pair,{}).get("signal")
