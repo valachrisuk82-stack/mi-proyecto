@@ -616,7 +616,9 @@ class MLScorer:
 
         vol_ratio = ind.get("vol",{}).get("ratio",1)
         buy_pct   = ind.get("vol",{}).get("buy_pct",50)
-        if vol_ratio>1.5 and buy_pct>60: scores["volume"] = 80
+        is_ext = vol_ratio == 0 or vol_ratio < 0.05  # ORO/FOREX sin volumen real
+        if is_ext:                           scores["volume"] = 60  # neutral para ORO/FOREX
+        elif vol_ratio>1.5 and buy_pct>60: scores["volume"] = 80
         elif vol_ratio>1.2:              scores["volume"] = 65
         elif vol_ratio<0.7:              scores["volume"] = 35
         else:                            scores["volume"] = 50
