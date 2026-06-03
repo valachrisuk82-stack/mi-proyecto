@@ -828,15 +828,16 @@ def get_atr_multipliers(pair):
 def calc_trailing_stop(signal, entry, current_price, atr):
     """Calcula trailing stop dinámico basado en ATR"""
     mult = CONFIG["trailing_atr_mult"]
+    # Usar entry si current_price no es válido
+    price = current_price if current_price > atr * 10 else entry
     if signal == "BUY":
-        # Trail stop sube con el precio
         initial_sl = entry - atr * 1.5
-        trail_sl   = current_price - atr * mult
+        trail_sl   = price - atr * mult
         active_sl  = max(initial_sl, trail_sl)
-        return round(active_sl, 6)
+        return round(active_sl, 4)
     else:
         initial_sl = entry + atr * 1.5
-        trail_sl   = current_price + atr * mult
+        trail_sl   = price + atr * mult
         active_sl  = min(initial_sl, trail_sl)
         return round(active_sl, 6)
 
@@ -1088,9 +1089,18 @@ def analyze_local(pair):
     sig    = ml.get("signal","WAIT")
     conf   = ml.get("confidence",50)
     sl_mult, tp_mult = get_atr_multipliers(pair)
-    sl     = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
-    tp     = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
-    trail  = calc_trailing_stop(sig, price, price, atr)
+    if sig == "BUY":
+        sl    = price - atr*sl_mult
+        tp    = price + atr*tp_mult
+        trail = calc_trailing_stop("BUY", price, price, atr)
+    elif sig == "SELL":
+        sl    = price + atr*sl_mult
+        tp    = price - atr*tp_mult
+        trail = calc_trailing_stop("SELL", price, price, atr)
+    else:  # WAIT — mostrar niveles potenciales neutros
+        sl    = price - atr*sl_mult
+        tp    = price + atr*tp_mult
+        trail = price - atr*sl_mult
     capital= CONFIG["capital"]; risk=CONFIG["risk_pct"]
     lot    = (capital*risk/100)/max(abs(price-sl),0.0001)
     rsi    = ind.get("rsi",50)
@@ -1166,12 +1176,12 @@ Headlines:
 
 FEAR & GREED: {fgi['value']} ({fgi['label']})
 MERCADO GLOBAL:
-BTC Dominancia: {gmd['btc_dominance']}% | Vol 24h: ${gmd['total_volume_24h']}B
-Market Cap Change 24h: {gmd['market_cap_change']}%
+BTC Dominancia: {gmd.get('btc_dominance',0)}% | Vol 24h: ${gmd.get('total_volume_24h',0)}B
+Market Cap Change 24h: {gmd.get('market_cap_change',0)}%
 DATOS MACRO E INSTITUCIONALES:
-Dólar (DXY proxy): {cot_data.get('dollar_strength','NEUTRAL')} | EUR/USD: {cot_data.get('eurusd',0)} | GBP/USD: {cot_data.get('gbpusd',0)}
-Eventos alto impacto: {macro_warn}
-Sentimiento noticias: {intel.get('news_sentiment','NEUTRAL')} | Score compuesto: {intel.get('composite_score',0)}
+Dólar: {cot_data.get('dollar_strength','NEUTRAL')} | EUR/USD: {cot_data.get('eurusd','N/A')} | GBP/USD: {cot_data.get('gbpusd','N/A')}
+Eventos macro: {macro_warn}
+Sentimiento: {intel.get('news_sentiment','NEUTRAL')} | Score: {intel.get('composite_score',0)}
 
 GESTIÓN RIESGO:
 Capital: ${capital} | Riesgo: {risk}% | SL=1.5xATR | TP=3xATR
@@ -1549,35 +1559,46 @@ def get_yahoo_price_simple(yf_ticker):
 def get_yahoo_klines_simple(yf_ticker, tf="5m"):
     try:
         tf_map  = {"1m":"1m","5m":"5m","15m":"15m","30m":"30m","1h":"60m","4h":"1h","1d":"1d","1w":"1wk"}
-        per_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"2y","1wk":"5y"}
-        yf_tf  = tf_map.get(tf,"5m")
-        period = per_map.get(yf_tf,"5d")
+        rng_map = {"1m":"1d","5m":"5d","15m":"1mo","30m":"1mo","60m":"3mo","1h":"3mo","1d":"2y","1wk":"5y"}
+        yf_tf   = tf_map.get(tf, "5m")
+        rng     = rng_map.get(yf_tf, "5d")
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}"
-        r = requests.get(url, params={"interval":yf_tf,"range":period,"includePrePost":False}, headers={"User-Agent":"Mozilla/5.0"}, timeout=10)
-        data  = r.json()
-        chart = data["chart"]["result"][0]
-        ts = chart.get("timestamp") or []
-        if not ts: return pd.DataFrame()
-        q  = chart["indicators"]["quote"][0]
-        df = pd.DataFrame({
-            "time":  pd.to_datetime(ts, unit="s"),
-            "open":  q.get("open",  [0]*len(ts)),
-            "high":  q.get("high",  [0]*len(ts)),
-            "low":   q.get("low",   [0]*len(ts)),
-            "close": q.get("close", [0]*len(ts)),
-            "volume":[x or 0 for x in q.get("volume",[0]*len(ts))],
-        }).dropna()
-        df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
-        return df
+        r = requests.get(url,
+            params={"interval": yf_tf, "range": rng, "includePrePost": False},
+            headers={"User-Agent":"Mozilla/5.0","Accept":"application/json"},
+            timeout=10)
+        data = r.json()
+        result = data["chart"]["result"][0]
+        quotes = result["indicators"]["quote"][0]
+        timestamps = result.get("timestamp", result.get("timestamps", []))
+        opens  = quotes.get("open",   [])
+        highs  = quotes.get("high",   [])
+        lows   = quotes.get("low",    [])
+        closes = quotes.get("close",  [])
+        vols   = quotes.get("volume", [None]*len(closes))
+        # Filtrar velas con None
+        rows = []
+        for t,o,h,l,c,v in zip(timestamps,opens,highs,lows,closes,vols):
+            if c is None or o is None: continue
+            rows.append({
+                "time":   pd.to_datetime(t, unit="s"),
+                "open":   float(o),
+                "high":   float(h) if h else float(c),
+                "low":    float(l) if l else float(c),
+                "close":  float(c),
+                "volume": float(v) if v else 0.0
+            })
+        if not rows: return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        # Rellenar volumen 0 con promedio para que el scorer funcione
+        avg_vol = df["volume"][df["volume"]>0].mean()
+        df["volume"] = df["volume"].replace(0, avg_vol if avg_vol>0 else 1.0)
+        return df.tail(200)
     except Exception as e:
-        print(f"[ERROR] Yahoo klines {yf_ticker}: {e}")
+        print(f"[Yahoo] {yf_ticker}: {e}")
         return pd.DataFrame()
 
-_ext_cache = {}
-_ext_cache_time = {}
-EXT_CACHE_TTL = 60
 
-@app.route("/api/ext_tickers")
 def ext_tickers():
     result = {}
     now = time.time()
