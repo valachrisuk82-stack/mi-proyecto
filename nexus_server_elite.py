@@ -1132,7 +1132,10 @@ def analyze_ai(pair):
     headlines_str = "\n".join(f"  • {h}" for h in news.get("headlines",[])[:3]) or "  Sin noticias recientes"
     patterns_str  = ", ".join(p["name"] for p in ind.get("patterns",[])) or "Ninguno"
 
-    gmd = get_global_market_data()
+    gmd  = get_global_market_data()
+    intel = get_cached_intelligence()
+    macro_warn = ", ".join(intel.get("warnings",[])) or "Sin eventos macro inmediatos"
+    cot_data   = intel.get("cot",{})
     prompt = f"""Eres NEXUS PRO ELITE AI — sistema institucional de análisis crypto con ML integrado.
 Responde ÚNICAMENTE con JSON válido.
 
@@ -1165,6 +1168,10 @@ FEAR & GREED: {fgi['value']} ({fgi['label']})
 MERCADO GLOBAL:
 BTC Dominancia: {gmd['btc_dominance']}% | Vol 24h: ${gmd['total_volume_24h']}B
 Market Cap Change 24h: {gmd['market_cap_change']}%
+DATOS MACRO E INSTITUCIONALES:
+Dólar (DXY proxy): {cot_data.get('dollar_strength','NEUTRAL')} | EUR/USD: {cot_data.get('eurusd',0)} | GBP/USD: {cot_data.get('gbpusd',0)}
+Eventos alto impacto: {macro_warn}
+Sentimiento noticias: {intel.get('news_sentiment','NEUTRAL')} | Score compuesto: {intel.get('composite_score',0)}
 
 GESTIÓN RIESGO:
 Capital: ${capital} | Riesgo: {risk}% | SL=1.5xATR | TP=3xATR
@@ -2751,6 +2758,169 @@ def dual_signal_api(symbol):
             else:
                 clean[k] = v
         return jsonify({"ok": True, "result": clean})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
+# ══════════════════════════════════════════════════════════════════
+#  MOTOR DE INTELIGENCIA DE MERCADO — NEWS + MACRO + INSTITUCIONAL
+# ══════════════════════════════════════════════════════════════════
+
+def get_macro_calendar():
+    """Obtiene eventos macro de alto impacto — Fed, CPI, NFP, etc."""
+    try:
+        r = requests.get(
+            "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+            timeout=8, headers={"User-Agent":"Mozilla/5.0"}
+        )
+        events = r.json()
+        high_impact = []
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        for ev in events:
+            if ev.get("impact") != "High": continue
+            try:
+                ev_time = datetime.fromisoformat(ev["date"].replace("Z","+00:00"))
+                diff_hours = (ev_time - now).total_seconds() / 3600
+                if -2 <= diff_hours <= 24:  # eventos en las últimas 2h o próximas 24h
+                    high_impact.append({
+                        "title": ev.get("title",""),
+                        "country": ev.get("country",""),
+                        "hours_away": round(diff_hours, 1),
+                        "forecast": ev.get("forecast",""),
+                        "previous": ev.get("previous","")
+                    })
+            except: continue
+        return high_impact[:5]
+    except Exception as e:
+        return []
+
+def get_financial_news():
+    """Obtiene noticias financieras de múltiples fuentes"""
+    news_items = []
+    sources = [
+        # CryptoCompare — crypto news
+        ("https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest", "crypto"),
+        # GNews — financial news (free tier)
+        ("https://gnews.io/api/v4/search?q=gold+forex+fed&lang=en&max=5&token=free", "macro"),
+    ]
+    try:
+        # Usar RSS de Reuters y Bloomberg via feedparser alternativo
+        rss_sources = [
+            "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",  # WSJ Markets
+            "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best",
+        ]
+        for url in rss_sources:
+            try:
+                r = requests.get(url, timeout=5, headers={"User-Agent":"Mozilla/5.0"})
+                if r.status_code == 200 and "<item>" in r.text:
+                    import re
+                    titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', r.text)[:3]
+                    for t in titles:
+                        news_items.append({"title": t, "source": "Reuters/WSJ"})
+            except: continue
+    except: pass
+
+    try:
+        # CryptoCompare news — más confiable
+        r = requests.get(
+            "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
+            timeout=8
+        )
+        d = r.json()
+        for item in d.get("Data", [])[:5]:
+            news_items.append({
+                "title": item.get("title",""),
+                "source": item.get("source",""),
+                "sentiment": "positive" if any(w in item.get("title","").lower() 
+                    for w in ["surge","rally","bull","gain","rise","high"]) else
+                             "negative" if any(w in item.get("title","").lower()
+                    for w in ["crash","drop","bear","fall","low","dump","fear"]) else "neutral"
+            })
+    except: pass
+    return news_items[:8]
+
+def get_cot_sentiment():
+    """COT Report — posiciones institucionales (CFTC)"""
+    try:
+        # Datos COT simplificados via API pública
+        r = requests.get(
+            "https://open.er-api.com/v6/latest/USD",
+            timeout=5
+        )
+        # Usar como proxy de fortaleza del dólar
+        d = r.json()
+        rates = d.get("rates", {})
+        # DXY proxy: si EUR/USD sube → dólar débil → ORO sube
+        eurusd = rates.get("EUR", 0.92)
+        gbpusd = rates.get("GBP", 0.79)
+        dxy_proxy = round((1/eurusd + 1/gbpusd) / 2 * 100, 2)
+        return {
+            "dxy_proxy": dxy_proxy,
+            "eurusd": round(1/eurusd, 4) if eurusd else 0,
+            "gbpusd": round(1/gbpusd, 4) if gbpusd else 0,
+            "dollar_strength": "STRONG" if dxy_proxy > 63 else "WEAK" if dxy_proxy < 60 else "NEUTRAL"
+        }
+    except:
+        return {"dxy_proxy": 0, "dollar_strength": "NEUTRAL"}
+
+def get_full_market_intelligence():
+    """Motor completo de inteligencia — combina todas las fuentes"""
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_global  = ex.submit(get_global_market_data)
+        f_macro   = ex.submit(get_macro_calendar)
+        f_news    = ex.submit(get_financial_news)
+        f_cot     = ex.submit(get_cot_sentiment)
+        global_data = f_global.result()
+        macro_events = f_macro.result()
+        news = f_news.result()
+        cot  = f_cot.result()
+
+    # Calcular score de sentimiento macro
+    macro_score = 0
+    warnings = []
+    if macro_events:
+        warnings.append(f"⚠️ {len(macro_events)} eventos de alto impacto próximos")
+        macro_score -= len(macro_events) * 5  # reducir confianza antes de datos macro
+
+    # Score de noticias
+    pos = sum(1 for n in news if n.get("sentiment")=="positive")
+    neg = sum(1 for n in news if n.get("sentiment")=="negative")
+    news_score = (pos - neg) * 10
+
+    # Fortaleza del dólar afecta ORO inversamente
+    dollar_impact = -10 if cot.get("dollar_strength")=="STRONG" else 10 if cot.get("dollar_strength")=="WEAK" else 0
+
+    return {
+        "global": global_data,
+        "macro_events": macro_events,
+        "news": news[:5],
+        "cot": cot,
+        "composite_score": macro_score + news_score + dollar_impact,
+        "warnings": warnings,
+        "news_sentiment": "POSITIVO" if news_score > 10 else "NEGATIVO" if news_score < -10 else "NEUTRAL"
+    }
+
+# Cache de inteligencia
+_intel_cache = {}
+_intel_time  = 0
+
+def get_cached_intelligence():
+    global _intel_cache, _intel_time
+    import time as _t
+    now = _t.time()
+    if now - _intel_time < 300:  # cache 5 minutos
+        return _intel_cache
+    _intel_cache = get_full_market_intelligence()
+    _intel_time  = now
+    return _intel_cache
+
+@app.route("/api/intelligence")
+def market_intelligence():
+    try:
+        intel = get_cached_intelligence()
+        return jsonify({"ok": True, "data": intel})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
