@@ -1697,25 +1697,36 @@ function localAI(pair){
   const slBuf = atr * 0.3;
   const isGold  = pair.includes("XAU");
   const isForex = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF"].includes(pair);
-  let sl, tp;
-  if(S.sigs[pair]?.sl && S.sigs[pair]?.tp) {
-    sl = S.sigs[pair].sl;
-    tp = S.sigs[pair].tp;
+  // Calcular SL/TP basado en ATR — simple y correcto
+  const isBuy  = sig === "BUY";
+  const isSell = sig === "SELL";
+  const slMult = isGold ? 2.0 : isForex ? 1.5 : 1.5;
+  const tpMult = isGold ? 4.0 : isForex ? 3.0 : 3.0;
+  let sl, tp, trail;
+  if(isBuy) {
+    sl    = price - atr * slMult;
+    tp    = price + atr * tpMult;
+    trail = price - atr * 1.0;
+  } else if(isSell) {
+    sl    = price + atr * slMult;
+    tp    = price - atr * tpMult;
+    trail = price + atr * 1.0;
   } else {
-    sl = dir==="BUY" ? swingLow - slBuf  : swingHigh + slBuf;
-    const slDist0 = Math.abs(price - sl);
-    const tpMult  = isGold ? 4.0 : isForex ? 3.0 : 2.5;
-    tp = dir==="BUY" ? price + slDist0*tpMult : price - slDist0*tpMult;
+    // WAIT — mostrar niveles neutrales para referencia
+    sl    = price - atr * slMult;
+    tp    = price + atr * tpMult;
+    trail = price - atr * 1.0;
   }
-  // Trail SL — en dirección correcta
-  const trail = dir==="BUY" ? sl : sl;
-  // R:R real
-  const slDist = Math.abs(price-sl);
-  const rrCalc = slDist > 0 ? Math.abs(tp-price)/slDist : 2;
+  // Verificación final de coherencia
+  if(isBuy  && sl >= price) sl = price - atr * slMult;
+  if(isSell && sl <= price) sl = price + atr * slMult;
+  if(isBuy  && tp <= price) tp = price + atr * tpMult;
+  if(isSell && tp >= price) tp = price - atr * tpMult;
+  const slDist = Math.abs(price - sl);
+  const rrCalc = slDist > 0 ? Math.abs(tp-price)/slDist : tpMult/slMult;
   const cap  = parseFloat(document.getElementById("inpCap").value)||1000;
   const risk = parseFloat(document.getElementById("inpRisk").value)||1;
-  // Lot size correcto
-  const lot = slDist > 0 ? parseFloat(((cap*risk/100)/slDist).toFixed(4)) : 0;
+  const lot  = slDist > 0 ? parseFloat(((cap*risk/100)/slDist).toFixed(4)) : 0;
   const patStr=patterns.length?patterns.map(p=>p.name).join(", "):"Sin patrones";
   applyResult({signal:sig,confidence:Math.round(55+Math.abs(score)*7),entry:price,sl,tp,trailing_sl:trail,rr:parseFloat(rrCalc.toFixed(1)),lot,trend:ema9>ema21?"ALCISTA":"BAJISTA",strength:rrCalc>=2?"FUERTE":rrCalc>=1.5?"MODERADO":"DÉBIL",reasoning:`RSI ${rsi.toFixed(0)}, MACD ${hist>0?"positivo":"negativo"}. ${patStr}.`,warnings:[],whale_alert:false,news_impact:"NEUTRAL"},pair);
 }

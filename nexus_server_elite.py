@@ -989,6 +989,13 @@ def update_all():
             ind = calc_all_indicators(df)
             if not ind: continue
             price = float(df["close"].iloc[-1])
+            # Para ORO y FOREX — usar precio spot de Swissquote (más exacto que Yahoo)
+            if pair == "XAUUSD":
+                spot = get_gold_spot_price()
+                if spot: price = spot
+            elif pair in ["GBPUSD", "EURUSD"]:
+                spot = get_forex_spot_price(pair)
+                if spot: price = spot
             atr   = ind.get("atr", price*0.001)
             ml    = ml_scorer.score(ind, {})
             sig   = ml["signal"]
@@ -1056,6 +1063,38 @@ _analyze_cache = {}
 _analyze_cache_time = {}
 ANALYZE_CACHE_TTL = 300  # 5 minutos
 
+
+
+def get_gold_spot_price():
+    """Precio spot XAU/USD de Swissquote — igual que MT5"""
+    try:
+        r = requests.get(
+            "https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD",
+            timeout=5
+        )
+        d = r.json()
+        bid = float(d[0]["spreadProfilePrices"][0]["bid"])
+        ask = float(d[0]["spreadProfilePrices"][0]["ask"])
+        return round((bid + ask) / 2, 2)
+    except:
+        return None
+
+def get_forex_spot_price(pair):
+    """Precio spot de pares forex via Swissquote"""
+    try:
+        # Convertir par al formato de Swissquote
+        base = pair[:3]
+        quote = pair[3:6]
+        r = requests.get(
+            f"https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/{base}/{quote}",
+            timeout=5
+        )
+        d = r.json()
+        bid = float(d[0]["spreadProfilePrices"][0]["bid"])
+        ask = float(d[0]["spreadProfilePrices"][0]["ask"])
+        return round((bid + ask) / 2, 5)
+    except:
+        return None
 
 def get_global_market_data():
     """Obtiene dominancia BTC, volumen total, datos macro"""
@@ -1330,6 +1369,13 @@ def indicators(symbol):
             if not df.empty and len(df) >= 30:
                 df["volume"] = df["volume"].replace(0,1).fillna(1)
                 ind = calc_all_indicators(df)
+                # Corregir precio con fuente spot más exacta
+                if sym == "XAUUSD":
+                    spot = get_gold_spot_price()
+                    if spot: ind["close"] = spot
+                elif sym in ["GBPUSD","EURUSD"]:
+                    spot = get_forex_spot_price(sym)
+                    if spot: ind["close"] = spot
                 ml  = ml_scorer.score(ind, {})
                 cache["indicators"][sym] = ind
                 cache["signals"][sym] = ml
