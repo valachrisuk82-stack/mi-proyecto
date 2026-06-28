@@ -1056,6 +1056,55 @@ def bg_updater():
         time.sleep(CONFIG["refresh_sec"])
 
 # ══════════════════════════════════════════════════════════════════
+#  MONITOR DEDICADO BTC + ORO — alertas Telegram automáticas
+# ══════════════════════════════════════════════════════════════════
+_priority_alert_state = {}  # recuerda última señal enviada por símbolo
+
+def check_priority_signal(sym, min_confidence=65):
+    """Revisa señal dual M1+H1 de un símbolo prioritario y alerta si cambia"""
+    try:
+        result = get_dual_tf_signal(sym)
+        if not result: return
+        sig  = result.get("signal", "WAIT")
+        conf = result.get("confidence", 0)
+        if sig == "WAIT" or conf < min_confidence:
+            return
+        prev = _priority_alert_state.get(sym, {}).get("signal")
+        if prev == sig:
+            return  # ya alertamos esta misma señal, no repetir
+        entry = result.get("entry", 0)
+        sl    = result.get("sl", 0)
+        tp    = result.get("tp", 0)
+        rr    = result.get("rr", 0)
+        reason = result.get("reason", "")
+        emoji = "🟢" if sig == "BUY" else "🔴"
+        nice_name = "ORO (XAUUSD)" if sym == "XAUUSD" else "BITCOIN (BTC)" if sym == "BTCUSDT" else sym
+        msg = (f"{emoji} <b>SEÑAL PRIORITARIA — {sig}</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━\n"
+               f"💎 Activo: <b>{nice_name}</b>\n"
+               f"💰 Entrada: <b>${entry:,.4f}</b>\n"
+               f"🛑 Stop Loss: <b>${sl:,.4f}</b>\n"
+               f"🎯 Take Profit: <b>${tp:,.4f}</b>\n"
+               f"📐 R:R: <b>1:{rr}</b>\n"
+               f"🤖 Confianza: <b>{conf}%</b>\n"
+               f"💬 {reason}\n"
+               f"🕐 {datetime.now().strftime('%H:%M')} Londres\n"
+               f"⚡ NEXUS APEX")
+        send_telegram(msg)
+        _priority_alert_state[sym] = {"signal": sig, "time": datetime.now()}
+        print(f"  [PRIORITY ALERT] {sym}: {sig} ({conf}%) enviado a Telegram")
+    except Exception as e:
+        print(f"  [PRIORITY ERROR] {sym}: {e}")
+
+def priority_monitor():
+    """Hilo dedicado — revisa BTC y ORO cada 60 segundos"""
+    PRIORITY_SYMBOLS = ["BTCUSDT", "XAUUSD"]
+    while True:
+        for sym in PRIORITY_SYMBOLS:
+            check_priority_signal(sym)
+        time.sleep(60)
+
+# ══════════════════════════════════════════════════════════════════
 #  CLAUDE AI
 # ══════════════════════════════════════════════════════════════════
 _analyze_cache = {}
@@ -3117,6 +3166,7 @@ print(f"  Telegram:  {'✅' if 'TU_API' not in CONFIG['telegram_token'] else '�
 print("═"*58)
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
+threading.Thread(target=priority_monitor, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
 threading.Thread(target=paper_trading_thread, daemon=True).start()
