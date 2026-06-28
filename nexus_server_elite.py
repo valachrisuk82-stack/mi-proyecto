@@ -900,6 +900,42 @@ cache = {
     "last_alerts":{},"sr_alerts":{},"smc_history":[],"smc_last_scan":{},
 }
 
+def process_pair(pair):
+    """Procesa un par individual — diseñado para ejecutarse en paralelo"""
+    try:
+        df  = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
+        if df.empty: return None
+        ind = calc_all_indicators(df)
+        ob  = get_orderbook_deep(pair)
+        news = cache["news"].get(pair, {"score":0})
+        ml  = ml_scorer.score(ind, ob, news.get("score",0))
+        cache["indicators"][pair] = ind
+        cache["orderflow"][pair]  = ob
+        cache["signals"][pair]    = ml
+        sig  = ml["signal"]
+        conf = ml["confidence"]
+        print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
+        ALERT_PAIRS = ["BTCUSDT","ADAUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
+        if pair not in ALERT_PAIRS:
+            return ml
+        prev = cache["last_alerts"].get(pair,{}).get("signal")
+        if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
+            price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
+            atr   = ind.get("atr", price*0.012)
+            sl_mult, tp_mult = get_atr_multipliers(pair)
+            sl    = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
+            tp    = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
+            trail = calc_trailing_stop(sig, price, price, atr)
+            msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
+            send_telegram(msg)
+            cache["last_alerts"][pair] = {"signal":sig,"time":datetime.now()}
+            cache["history"].insert(0,{"time":datetime.now().strftime("%H:%M:%S"),"pair":pair,"signal":sig,"confidence":conf,"price":round(price,4),"ml_score":ml["ml_score"],"source":"AUTO"})
+            if len(cache["history"])>100: cache["history"]=cache["history"][:100]
+        return ml
+    except Exception as e:
+        print(f"  ✗ {pair}: {e}")
+        return None
+
 def update_all():
     if cache["updating"]: return
     cache["updating"] = True
@@ -907,44 +943,11 @@ def update_all():
     tickers = get_all_tickers()
     if tickers: cache["tickers"] = tickers
     cache["fgi"] = get_fear_greed()
-
-    for pair in PAIRS:
-        try:
-            df  = get_klines(pair, CONFIG["kline_tf"], CONFIG["kline_limit"])
-            if df.empty: continue
-            ind = calc_all_indicators(df)
-            ob  = get_orderbook_deep(pair)
-            news = cache["news"].get(pair, {"score":0})
-            ml  = ml_scorer.score(ind, ob, news.get("score",0))
-            cache["indicators"][pair] = ind
-            cache["orderflow"][pair]  = ob
-            cache["signals"][pair]    = ml
-
-            sig  = ml["signal"]
-            conf = ml["confidence"]
-            # Solo alertar para pares seleccionados
-            ALERT_PAIRS = ["BTCUSDT","ADAUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
-            if pair not in ALERT_PAIRS:
-                continue
-            prev = cache["last_alerts"].get(pair,{}).get("signal")
-
-            if sig in ["BUY","SELL"] and conf>=CONFIG["min_confidence"] and sig!=prev:
-                price = float(cache["tickers"].get(pair,{}).get("lastPrice",0))
-                atr   = ind.get("atr", price*0.012)
-                sl_mult, tp_mult = get_atr_multipliers(pair)
-                sl    = price - atr*sl_mult if sig=="BUY" else price + atr*sl_mult
-                tp    = price + atr*tp_mult if sig=="BUY" else price - atr*tp_mult
-                trail = calc_trailing_stop(sig, price, price, atr)
-                msg   = tg_alert(pair, sig, conf, price, sl, tp, 2.0, trail, "Señal ML automática", ml["ml_score"], news.get("score",0))
-                send_telegram(msg)
-                cache["last_alerts"][pair] = {"signal":sig,"time":datetime.now()}
-                cache["history"].insert(0,{"time":datetime.now().strftime("%H:%M:%S"),"pair":pair,"signal":sig,"confidence":conf,"price":round(price,4),"ml_score":ml["ml_score"],"source":"AUTO"})
-                if len(cache["history"])>100: cache["history"]=cache["history"][:100]
-
-            print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
-            time.sleep(0.25)
-        except Exception as e:
-            print(f"  ✗ {pair}: {e}")
+    # Procesar BTC y ORO PRIMERO y con prioridad — luego el resto en paralelo
+    from concurrent.futures import ThreadPoolExecutor
+    process_pair("BTCUSDT")
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        list(ex.map(process_pair, [p for p in PAIRS if p != "BTCUSDT"]))
 
     # ── Alertas de precio en S/R ──
     for pair in PAIRS:
@@ -2988,6 +2991,111 @@ def market_intelligence():
     try:
         intel = get_cached_intelligence()
         return jsonify({"ok": True, "data": intel})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+# ══════════════════════════════════════════════════════════════════
+#  TRADINGVIEW WEBHOOK — precios exactos en tiempo real
+# ══════════════════════════════════════════════════════════════════
+_tv_prices = {}  # cache de precios recibidos de TradingView
+_tv_secret = os.environ.get("TV_WEBHOOK_SECRET", "nexus_tv_2026")
+
+@app.route("/api/tv_webhook", methods=["POST"])
+def tv_webhook():
+    """Recibe precios en tiempo real desde alertas de TradingView"""
+    try:
+        data = request.get_json(force=True)
+        # Seguridad simple por secret compartido
+        if data.get("secret") != _tv_secret:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        symbol = str(data.get("symbol", "")).upper()
+        price  = float(data.get("price", 0))
+        if not symbol or not price:
+            return jsonify({"ok": False, "error": "missing symbol/price"}), 400
+        _tv_prices[symbol] = {"price": price, "ts": time.time()}
+        # Si el símbolo coincide con un par interno, sobreescribir el precio en cache
+        # Mapear símbolos comunes de TradingView a los nuestros
+        tv_map = {
+            "XAUUSD": "XAUUSD", "GOLD": "XAUUSD",
+            "BTCUSD": "BTCUSDT", "BTCUSDT": "BTCUSDT",
+            "GBPUSD": "GBPUSD", "EURUSD": "EURUSD"
+        }
+        internal = tv_map.get(symbol, symbol)
+        if internal in cache.get("indicators", {}):
+            cache["indicators"][internal]["close"] = price
+        if internal in cache.get("tickers", {}):
+            cache["tickers"][internal]["lastPrice"] = price
+        print(f"[TV] {symbol} → ${price} (cached as {internal})")
+        return jsonify({"ok": True, "symbol": internal, "price": price})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+def get_tv_price(symbol, max_age_sec=120):
+    """Devuelve precio de TradingView si es reciente, sino None"""
+    entry = _tv_prices.get(symbol.upper())
+    if not entry: return None
+    if time.time() - entry["ts"] > max_age_sec: return None
+    return entry["price"]
+
+@app.route("/api/quick_intel/<symbol>")
+def quick_intel(symbol):
+    """Endpoint ultrarrápido — todo lo necesario para BTC/ORO en una sola llamada"""
+    sym = symbol.upper()
+    try:
+        # Precio en vivo
+        if sym in cache["tickers"]:
+            price = float(cache["tickers"][sym].get("lastPrice", 0))
+        elif sym == "XAUUSD":
+            price = get_gold_spot_price() or 0
+        elif sym in ["GBPUSD", "EURUSD"]:
+            price = get_forex_spot_price(sym) or 0
+        else:
+            price = 0
+
+        ind = cache["indicators"].get(sym, {})
+        ml  = cache["signals"].get(sym, {"signal":"WAIT","confidence":0,"ml_score":50})
+
+        # Señal dual M1+H1 (ya cacheada con TTL 60s)
+        dual = get_dual_tf_signal(sym)
+
+        # Inteligencia macro/news (cacheada 5 min)
+        try:
+            intel = get_cached_intelligence()
+        except:
+            intel = {}
+
+        def sanitize(obj):
+            """Convierte tipos numpy/pandas a tipos nativos de Python para JSON"""
+            if isinstance(obj, dict):
+                return {k: sanitize(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [sanitize(v) for v in obj]
+            if hasattr(obj, "item"):  # numpy scalar (bool_, int64, float64...)
+                return obj.item()
+            return obj
+
+        payload = {
+            "ok": True,
+            "symbol": sym,
+            "price": price,
+            "rsi": ind.get("rsi"),
+            "ema9": ind.get("ema9"),
+            "ema21": ind.get("ema21"),
+            "atr": ind.get("atr"),
+            "signal": ml.get("signal"),
+            "confidence": ml.get("confidence"),
+            "ml_score": ml.get("ml_score"),
+            "dual_signal": dual,
+            "macro": {
+                "dollar_strength": intel.get("cot", {}).get("dollar_strength", "NEUTRAL"),
+                "news_sentiment": intel.get("news_sentiment", "NEUTRAL"),
+                "composite_score": intel.get("composite_score", 0),
+                "macro_events": intel.get("macro_events", []),
+                "top_news": intel.get("news", [])[:3]
+            },
+            "fgi": cache.get("fgi", {})
+        }
+        return jsonify(sanitize(payload))
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
