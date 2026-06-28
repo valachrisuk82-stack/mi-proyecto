@@ -3218,6 +3218,102 @@ def copy_trading_monitor():
         time.sleep(60)
 
 
+
+# ══════════════════════════════════════════════════════════════════
+#  REPORTES PROGRAMADOS — Londres 9:30 GMT / Nueva York 15:00 GMT
+# ══════════════════════════════════════════════════════════════════
+_scheduled_report_sent = {"london": None, "ny": None}
+
+def send_scheduled_report(session_name):
+    """Envía análisis completo de ORO y BTC con Claude AI + señal certificada"""
+    try:
+        send_telegram(f"📊 <b>REPORTE {session_name.upper()}</b>\n━━━━━━━━━━━━━━━━━━━━\n⏳ Analizando ORO y BTC con IA...")
+
+        for sym, nice_name, is_certified in [("XAUUSD", "🥇 ORO (XAUUSD)", True), ("BTCUSDT", "₿ BITCOIN (BTC)", False)]:
+            try:
+                # 1. Señal certificada (solo aplica de verdad para ORO)
+                copy_sig = get_copy_trading_signal(sym) if sym == "XAUUSD" else None
+
+                # 2. Análisis completo de Claude AI
+                try:
+                    ai_result = analyze_ai(sym)
+                except Exception as e:
+                    ai_result = None
+                    print(f"  [SCHEDULED REPORT] analyze_ai falló para {sym}: {e}")
+
+                price = float(cache["tickers"].get(sym, {}).get("lastPrice", 0)) or \
+                        (get_gold_spot_price() if sym == "XAUUSD" else 0) or \
+                        (copy_sig.get("entry") if copy_sig else 0)
+
+                cert_block = ""
+                if copy_sig and copy_sig.get("signal") != "WAIT":
+                    sig = copy_sig["signal"]
+                    emoji_c = "🟢" if sig == "BUY" else "🔴"
+                    cert_block = (f"\n{emoji_c} <b>SEÑAL CERTIFICADA: {sig}</b> (Fiabilidad histórica 70.8%)\n"
+                                  f"Entry: ${copy_sig['entry']:,.4f} | SL: ${copy_sig['sl']:,.4f} | "
+                                  f"TP: ${copy_sig['tp']:,.4f} | R:R 1:{copy_sig['rr']}\n")
+                elif is_certified:
+                    cert_block = "\n⏳ Sin señal certificada en este momento (esperando confluencia)\n"
+
+                if ai_result:
+                    ai_signal = ai_result.get("signal", "WAIT")
+                    ai_conf = ai_result.get("confidence", 0)
+                    ai_reasoning = ai_result.get("reasoning", "Sin análisis disponible")
+                    ai_entry = ai_result.get("entry", price)
+                    ai_sl = ai_result.get("sl", 0)
+                    ai_tp = ai_result.get("tp", 0)
+                    ai_block = (f"🤖 <b>Análisis IA:</b> {ai_signal} ({ai_conf}% confianza)\n"
+                                f"💬 {ai_reasoning}\n")
+                else:
+                    ai_block = "🤖 Análisis IA no disponible en este momento\n"
+
+                disclaimer = "" if is_certified else "\n⚠️ <i>BTC es informativo — sin fiabilidad certificada por backtest</i>\n"
+
+                msg = (f"{nice_name}\n"
+                       f"💰 Precio: <b>${price:,.4f}</b>\n"
+                       f"{cert_block}"
+                       f"{ai_block}"
+                       f"{disclaimer}"
+                       f"━━━━━━━━━━━━━━━━━━━━")
+                send_telegram(msg)
+                time.sleep(1)
+            except Exception as e:
+                send_telegram(f"⚠️ Error analizando {sym}: {e}")
+                print(f"  [SCHEDULED REPORT ERROR] {sym}: {e}")
+
+        send_telegram(f"✅ Reporte {session_name.upper()} completado — {datetime.now().strftime('%H:%M')} Londres\n⚡ NEXUS APEX")
+    except Exception as e:
+        print(f"  [SCHEDULED REPORT FATAL] {e}")
+
+def scheduled_reports_monitor():
+    """Hilo dedicado — revisa cada minuto si toca enviar el reporte de Londres o NY"""
+    while True:
+        try:
+            now_utc = datetime.utcnow()
+            today_str = now_utc.strftime("%Y-%m-%d")
+            hhmm = now_utc.strftime("%H:%M")
+
+            # Londres: 9:30 GMT (1.5h después de apertura 8:00)
+            if hhmm == "09:30" and _scheduled_report_sent["london"] != today_str:
+                send_scheduled_report("Londres 09:30 GMT")
+                _scheduled_report_sent["london"] = today_str
+
+            # Nueva York: 15:00 GMT (1.5h después de apertura 13:30 GMT)
+            if hhmm == "15:00" and _scheduled_report_sent["ny"] != today_str:
+                send_scheduled_report("Nueva York 15:00 GMT")
+                _scheduled_report_sent["ny"] = today_str
+
+        except Exception as e:
+            print(f"  [SCHEDULED MONITOR ERROR] {e}")
+        time.sleep(30)
+
+@app.route("/api/test_scheduled_report/<session_name>")
+def test_scheduled_report(session_name):
+    """Endpoint manual para probar el reporte sin esperar la hora exacta"""
+    send_scheduled_report(session_name)
+    return jsonify({"ok": True, "message": f"Reporte {session_name} enviado"})
+
+
 @app.route("/api/quick_intel/<symbol>")
 def quick_intel(symbol):
     """Endpoint ultrarrápido — todo lo necesario para BTC/ORO en una sola llamada"""
@@ -3300,6 +3396,7 @@ threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=priority_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
+threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
 threading.Thread(target=paper_trading_thread, daemon=True).start()
