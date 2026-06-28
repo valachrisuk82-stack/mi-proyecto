@@ -3229,8 +3229,16 @@ def send_scheduled_report(session_name):
     try:
         send_telegram(f"📊 <b>REPORTE {session_name.upper()}</b>\n━━━━━━━━━━━━━━━━━━━━\n⏳ Analizando ORO y BTC con IA...")
 
+        is_weekend = datetime.utcnow().weekday() >= 5  # 5=sábado, 6=domingo
+
         for sym, nice_name, is_certified in [("XAUUSD", "🥇 ORO (XAUUSD)", True), ("BTCUSDT", "₿ BITCOIN (BTC)", False)]:
             try:
+                # ORO/Forex cierran fin de semana — BTC opera 24/7
+                if is_weekend and sym == "XAUUSD":
+                    send_telegram(f"{nice_name}\n🔒 <b>Mercado cerrado</b> — ORO no opera los fines de semana.\nVuelve a abrir el lunes con la sesión asiática.\n━━━━━━━━━━━━━━━━━━━━")
+                    time.sleep(1)
+                    continue
+
                 # 1. Señal certificada (solo aplica de verdad para ORO)
                 copy_sig = get_copy_trading_signal(sym) if sym == "XAUUSD" else None
 
