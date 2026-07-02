@@ -915,7 +915,7 @@ def process_pair(pair):
         sig  = ml["signal"]
         conf = ml["confidence"]
         print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
-        ALERT_PAIRS = ["BTCUSDT","ADAUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
+        ALERT_PAIRS = ["BTCUSDT"]  # Solo BTC — resto va por reportes programados
         if pair not in ALERT_PAIRS:
             return ml
         prev = cache["last_alerts"].get(pair,{}).get("signal")
@@ -974,7 +974,7 @@ def update_all():
             cache["sr_alerts"] = {k:v for k,v in prev_alerts.items() if (datetime.now()-v).seconds < 7200}
         except: pass
     # ── Alertas para activos externos (ORO, FOREX) ──
-    EXT_ALERT_PAIRS = ["XAUUSD", "GBPUSD", "EURUSD"]
+    EXT_ALERT_PAIRS = []  # Desactivado — alertas externas van por reportes programados
     for pair in EXT_ALERT_PAIRS:
         try:
             if pair not in ALL_EXTERNAL: continue
@@ -1028,6 +1028,7 @@ def update_all():
 
 
 def smc_scanner():
+    return  # Desactivado — solo señales de activos prioritarios
     """Thread que escanea SMC cada 5 minutos"""
     import time as _time
     _time.sleep(30)  # esperar que arranque el servidor
@@ -1096,7 +1097,7 @@ def check_priority_signal(sym, min_confidence=65):
 
 def priority_monitor():
     """Hilo dedicado — revisa BTC y ORO cada 60 segundos"""
-    PRIORITY_SYMBOLS = ["BTCUSDT", "XAUUSD"]
+    PRIORITY_SYMBOLS = ["BTCUSDT", "XAUUSD", "GBPUSD"]  # Solo activos prioritarios
     while True:
         for sym in PRIORITY_SYMBOLS:
             check_priority_signal(sym)
@@ -3231,7 +3232,11 @@ def send_scheduled_report(session_name):
 
         is_weekend = datetime.utcnow().weekday() >= 5  # 5=sábado, 6=domingo
 
-        for sym, nice_name, is_certified in [("XAUUSD", "🥇 ORO (XAUUSD)", True), ("BTCUSDT", "₿ BITCOIN (BTC)", False)]:
+        REPORT_ASSETS = [
+            ("XAUUSD",  "🥇 ORO (XAUUSD)",  True),
+            ("BTCUSDT", "₿ BITCOIN (BTC)",  False),
+        ]
+        for sym, nice_name, is_certified in REPORT_ASSETS:
             try:
                 # ORO/Forex cierran fin de semana — BTC opera 24/7
                 if is_weekend and sym == "XAUUSD":
@@ -3239,19 +3244,29 @@ def send_scheduled_report(session_name):
                     time.sleep(1)
                     continue
 
-                # 1. Señal certificada (solo aplica de verdad para ORO)
+                # 1. Obtener precio PRIMERO
+                if sym == "XAUUSD":
+                    price = get_gold_spot_price() or 0
+                elif sym == "GBPUSD":
+                    price = get_forex_spot_price("GBPUSD") or 0
+                elif sym in cache["tickers"] and cache["tickers"].get(sym, {}).get("lastPrice"):
+                    price = float(cache["tickers"][sym]["lastPrice"])
+                else:
+                    price = 0
+                # Inyectar precio en cache para que analyze_ai lo encuentre
+                if price > 0:
+                    cache["tickers"][sym] = {"lastPrice": str(price), "priceChangePercent": "0"}
+                # 2. Señal certificada (solo para ORO)
                 copy_sig = get_copy_trading_signal(sym) if sym == "XAUUSD" else None
-
-                # 2. Análisis completo de Claude AI
+                # 3. Análisis Claude AI via endpoint HTTP (más confiable para todos los activos)
                 try:
-                    ai_result = analyze_ai(sym)
+                    port = int(os.environ.get("PORT", 5001))
+                    r_ai = requests.post(f"http://localhost:{port}/api/analyze/{sym}", timeout=20)
+                    ai_data = r_ai.json()
+                    ai_result = ai_data.get("result") if ai_data.get("ok") else None
                 except Exception as e:
                     ai_result = None
-                    print(f"  [SCHEDULED REPORT] analyze_ai falló para {sym}: {e}")
-
-                price = float(cache["tickers"].get(sym, {}).get("lastPrice", 0)) or \
-                        (get_gold_spot_price() if sym == "XAUUSD" else 0) or \
-                        (copy_sig.get("entry") if copy_sig else 0)
+                    print(f"  [SCHEDULED REPORT] analyze HTTP falló para {sym}: {e}")
 
                 cert_block = ""
                 if copy_sig and copy_sig.get("signal") != "WAIT":
@@ -3294,22 +3309,26 @@ def send_scheduled_report(session_name):
         print(f"  [SCHEDULED REPORT FATAL] {e}")
 
 def scheduled_reports_monitor():
-    """Hilo dedicado — revisa cada minuto si toca enviar el reporte de Londres o NY"""
+    """Hilo dedicado — 4 reportes diarios: 9:30, 11:00 (Londres) y 14:00, 15:30 (NY)"""
+    _sent = {}
     while True:
         try:
-            now_utc = datetime.utcnow()
+            from datetime import timezone
+            now_utc = datetime.now(timezone.utc)
             today_str = now_utc.strftime("%Y-%m-%d")
             hhmm = now_utc.strftime("%H:%M")
 
-            # Londres: 9:30 GMT (1.5h después de apertura 8:00)
-            if hhmm == "09:30" and _scheduled_report_sent["london"] != today_str:
-                send_scheduled_report("Londres 09:30 GMT")
-                _scheduled_report_sent["london"] = today_str
-
-            # Nueva York: 15:00 GMT (1.5h después de apertura 13:30 GMT)
-            if hhmm == "15:00" and _scheduled_report_sent["ny"] != today_str:
-                send_scheduled_report("Nueva York 15:00 GMT")
-                _scheduled_report_sent["ny"] = today_str
+            sessions = [
+                ("09:30", "🇬🇧 LONDRES — Apertura 9:30 GMT"),
+                ("11:00", "🇬🇧 LONDRES — Confirmación 11:00 GMT"),
+                ("14:00", "🗽 NUEVA YORK — Pre-apertura 14:00 GMT"),
+                ("15:30", "🗽 NUEVA YORK — Apertura 15:30 GMT"),
+            ]
+            for session_time, session_name in sessions:
+                key = f"{today_str}_{session_time}"
+                if hhmm == session_time and key not in _sent:
+                    send_scheduled_report(session_name)
+                    _sent[key] = True
 
         except Exception as e:
             print(f"  [SCHEDULED MONITOR ERROR] {e}")
