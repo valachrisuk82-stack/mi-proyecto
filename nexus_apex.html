@@ -472,7 +472,8 @@ canvas{position:absolute;top:0;left:0}
           <input id="jSl" type="number" placeholder="SL" style="background:#0f172a;border:1px solid #1e293b;color:#ef4444;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
           <input id="jTp" type="number" placeholder="TP" style="background:#0f172a;border:1px solid #1e293b;color:#10b981;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
         </div>
-        <button onclick="registerTrade()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px">+ REGISTRAR</button>
+        <button onclick="registerTrade()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px;margin-bottom:3px">+ REGISTRAR</button>
+        <button onclick="exportToExcel()" style="width:100%;background:linear-gradient(135deg,#065f46,#10b981);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px">📊 EXPORTAR EXCEL</button>
       </div>
       <!-- Lista últimas operaciones -->
       <div id="jTradeList" style="display:flex;flex-direction:column;gap:3px;max-height:80px;overflow-y:auto"></div>
@@ -1322,6 +1323,33 @@ async function closeTradeManual(trade_id, outcome) {
     body: JSON.stringify({trade_id, outcome})
   });
   loadJournal();
+}
+
+async function exportToExcel() {
+  try {
+    const r = await fetch(`${API_BASE}/journal/trades`);
+    const trades = await r.json();
+    if (!trades.length) { alert('No hay operaciones para exportar'); return; }
+    // Crear CSV con formato Excel
+    const headers = ['Fecha','Par','Dirección','Entrada','Stop Loss','Take Profit','R:R','Resultado','P&L (R)','Confianza','Fuente'];
+    const rows = trades.map(t => [
+      t.ts || '', t.pair || '', t.signal || '',
+      t.entry || '', t.sl || '', t.tp || '',
+      t.rr || '', t.outcome || '', t.pnl_r || '',
+      t.confidence || '', t.source || ''
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(r => r.map(v => `"${v}"`).join(','))
+      .join('\n');
+    // Descargar como CSV (Excel lo abre directamente)
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `NEXUS_APEX_Diario_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Error exportando: ' + e.message); }
 }
 
 async function registerTrade() {
