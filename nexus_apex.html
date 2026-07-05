@@ -449,31 +449,10 @@ canvas{position:absolute;top:0;left:0}
           <div id="jToday" style="font-size:13px;font-weight:800;color:#fbbf24">--R</div>
         </div>
       </div>
-      <!-- Formulario registro rápido -->
-      <div style="background:rgba(2,3,10,0.8);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px;margin-bottom:6px">
-        <div style="font-size:7px;color:#475569;margin-bottom:4px;letter-spacing:1px">REGISTRAR OPERACIÓN</div>
-        <select id="jPair" style="width:100%;background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:9px;padding:3px;border-radius:3px;margin-bottom:3px;font-family:JetBrains Mono,monospace">
-          <option value="XAUUSD">🥇 ORO (XAUUSD)</option>
-          <option value="BTCUSDT">₿ BTC</option>
-        </select>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:3px">
-          <select id="jDir" style="background:#0f172a;border:1px solid #1e293b;color:#10b981;font-size:9px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace">
-            <option value="LONG">🟢 BUY</option>
-            <option value="SHORT">🔴 SELL</option>
-          </select>
-          <select id="jOutcome" style="background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:9px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace">
-            <option value="WIN">✅ WIN</option>
-            <option value="LOSS">❌ LOSS</option>
-            <option value="OPEN">⏳ OPEN</option>
-          </select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:4px">
-          <input id="jEntry" type="number" placeholder="Entry" style="background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
-          <input id="jSl" type="number" placeholder="SL" style="background:#0f172a;border:1px solid #1e293b;color:#ef4444;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
-          <input id="jTp" type="number" placeholder="TP" style="background:#0f172a;border:1px solid #1e293b;color:#10b981;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
-        </div>
-        <button onclick="registerTrade()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px;margin-bottom:3px">+ REGISTRAR</button>
-        <button onclick="exportToExcel()" style="width:100%;background:linear-gradient(135deg,#065f46,#10b981);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px">📊 EXPORTAR EXCEL</button>
+      <!-- Botones acción -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+        <button onclick="openTradeModal()" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:8px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace">+ REGISTRAR</button>
+        <button onclick="exportToExcel()" style="background:linear-gradient(135deg,#065f46,#10b981);border:none;color:#fff;font-size:8px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace">📊 EXCEL</button>
       </div>
       <!-- Lista últimas operaciones -->
       <div id="jTradeList" style="display:flex;flex-direction:column;gap:3px;max-height:60px;overflow-y:auto"></div>
@@ -1379,6 +1358,7 @@ async function registerTrade() {
       document.getElementById('jEntry').value = '';
       document.getElementById('jSl').value = '';
       document.getElementById('jTp').value = '';
+      closeTradeModal();
       loadJournal();
     }
   } catch(e) { console.error('Error registrando trade:', e); }
@@ -1783,7 +1763,9 @@ async function runAI(){
   }else{localAI(pair);done();return;}
   if(result)applyResult(result,pair);
   done();
-  function done(){btn.disabled=false;btn.textContent="▶ ANALIZAR CON IA";document.getElementById("aiSpin").style.display="none";}
+  function done(){btn.disabled=false;btn.textContent="▶ ANALIZAR CON IA";btn.className="analyze-btn";document.getElementById("aiSpin").style.display="none";}
+  // Safety reset — si en 15s no termina, resetear el botón
+  setTimeout(()=>done(), 15000);
 }
 
 function localAI(pair){
@@ -2005,5 +1987,56 @@ function toggleAiPanel(){
 }
 
 </script>
+
+<!-- Modal Registro de Operación -->
+<div id="tradeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;width:340px;font-family:JetBrains Mono,monospace">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="color:#e2e8f0;font-size:13px;font-weight:700">📒 REGISTRAR OPERACIÓN</div>
+      <div onclick="closeTradeModal()" style="color:#64748b;cursor:pointer;font-size:16px">✕</div>
+    </div>
+    <select id="jPair" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:11px;padding:8px;border-radius:6px;margin-bottom:10px;font-family:JetBrains Mono,monospace">
+      <option value="XAUUSD">🥇 ORO (XAUUSD)</option>
+      <option value="BTCUSDT">₿ BITCOIN (BTC)</option>
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <select id="jDir" style="background:#1e293b;border:1px solid #334155;color:#10b981;font-size:11px;padding:8px;border-radius:6px;font-family:JetBrains Mono,monospace">
+        <option value="LONG">🟢 BUY</option>
+        <option value="SHORT">🔴 SELL</option>
+      </select>
+      <select id="jOutcome" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:11px;padding:8px;border-radius:6px;font-family:JetBrains Mono,monospace">
+        <option value="OPEN">⏳ OPEN</option>
+        <option value="WIN">✅ WIN</option>
+        <option value="LOSS">❌ LOSS</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div>
+        <div style="font-size:9px;color:#475569;margin-bottom:4px">ENTRADA</div>
+        <input id="jEntry" type="number" placeholder="0.00" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:11px;padding:7px;border-radius:6px;font-family:JetBrains Mono,monospace;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:9px;color:#ef4444;margin-bottom:4px">STOP LOSS</div>
+        <input id="jSl" type="number" placeholder="0.00" style="width:100%;background:#1e293b;border:1px solid #334155;color:#ef4444;font-size:11px;padding:7px;border-radius:6px;font-family:JetBrains Mono,monospace;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:9px;color:#10b981;margin-bottom:4px">TAKE PROFIT</div>
+        <input id="jTp" type="number" placeholder="0.00" style="width:100%;background:#1e293b;border:1px solid #334155;color:#10b981;font-size:11px;padding:7px;border-radius:6px;font-family:JetBrains Mono,monospace;box-sizing:border-box">
+      </div>
+    </div>
+    <button onclick="registerTrade()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:12px;font-weight:700;padding:12px;border-radius:8px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px">+ REGISTRAR OPERACIÓN</button>
+  </div>
+</div>
+
+function openTradeModal() {
+  const modal = document.getElementById('tradeModal');
+  modal.style.display = 'flex';
+  // Pre-rellenar con precio actual
+  const price = S.tickers[S.pair]?.price || 0;
+  if (price) document.getElementById('jEntry').value = price.toFixed(2);
+}
+function closeTradeModal() {
+  document.getElementById('tradeModal').style.display = 'none';
+}
 </body>
 </html>
