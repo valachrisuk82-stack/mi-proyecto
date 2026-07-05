@@ -427,6 +427,56 @@ canvas{position:absolute;top:0;left:0}
         <div class="lvl-item"><div class="lvl-lbl">R:R</div><div class="lvl-val lv-rr" id="lvRr">---</div></div>
       </div>
     </div>
+    <!-- COL 3: DIARIO DE TRADING -->
+    <div class="ai-col" style="min-width:200px">
+      <div class="ai-col-title">📒 Diario de Trading</div>
+      <!-- Estadísticas rápidas -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:4px;padding:4px;text-align:center">
+          <div style="font-size:7px;color:#475569">WIN RATE</div>
+          <div id="jWR" style="font-size:13px;font-weight:800;color:#10b981">--%</div>
+        </div>
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:4px;text-align:center">
+          <div style="font-size:7px;color:#475569">NET R</div>
+          <div id="jNetR" style="font-size:13px;font-weight:800;color:#3b82f6">--R</div>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:4px;padding:4px;text-align:center">
+          <div style="font-size:7px;color:#475569">TRADES</div>
+          <div id="jTotal" style="font-size:13px;font-weight:800;color:#fbbf24">--</div>
+        </div>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:4px;padding:4px;text-align:center">
+          <div style="font-size:7px;color:#475569">HOY</div>
+          <div id="jToday" style="font-size:13px;font-weight:800;color:#fbbf24">--R</div>
+        </div>
+      </div>
+      <!-- Formulario registro rápido -->
+      <div style="background:rgba(2,3,10,0.8);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px;margin-bottom:6px">
+        <div style="font-size:7px;color:#475569;margin-bottom:4px;letter-spacing:1px">REGISTRAR OPERACIÓN</div>
+        <select id="jPair" style="width:100%;background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:9px;padding:3px;border-radius:3px;margin-bottom:3px;font-family:JetBrains Mono,monospace">
+          <option value="XAUUSD">🥇 ORO (XAUUSD)</option>
+          <option value="BTCUSDT">₿ BTC</option>
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:3px">
+          <select id="jDir" style="background:#0f172a;border:1px solid #1e293b;color:#10b981;font-size:9px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace">
+            <option value="LONG">🟢 BUY</option>
+            <option value="SHORT">🔴 SELL</option>
+          </select>
+          <select id="jOutcome" style="background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:9px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace">
+            <option value="WIN">✅ WIN</option>
+            <option value="LOSS">❌ LOSS</option>
+            <option value="OPEN">⏳ OPEN</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:4px">
+          <input id="jEntry" type="number" placeholder="Entry" style="background:#0f172a;border:1px solid #1e293b;color:#e2e8f0;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
+          <input id="jSl" type="number" placeholder="SL" style="background:#0f172a;border:1px solid #1e293b;color:#ef4444;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
+          <input id="jTp" type="number" placeholder="TP" style="background:#0f172a;border:1px solid #1e293b;color:#10b981;font-size:8px;padding:3px;border-radius:3px;font-family:JetBrains Mono,monospace;width:100%">
+        </div>
+        <button onclick="registerTrade()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;color:#fff;font-size:9px;font-weight:700;padding:5px;border-radius:4px;cursor:pointer;font-family:JetBrains Mono,monospace;letter-spacing:1px">+ REGISTRAR</button>
+      </div>
+      <!-- Lista últimas operaciones -->
+      <div id="jTradeList" style="display:flex;flex-direction:column;gap:3px;max-height:80px;overflow-y:auto"></div>
+    </div>
 
     <!-- COL 4: CONFIG + BOTONES -->
     <div class="ai-col">
@@ -1272,6 +1322,46 @@ async function closeTradeManual(trade_id, outcome) {
     body: JSON.stringify({trade_id, outcome})
   });
   loadJournal();
+}
+
+async function registerTrade() {
+  const pair    = document.getElementById('jPair').value;
+  const dir     = document.getElementById('jDir').value;
+  const outcome = document.getElementById('jOutcome').value;
+  const entry   = parseFloat(document.getElementById('jEntry').value) || 0;
+  const sl      = parseFloat(document.getElementById('jSl').value) || 0;
+  const tp      = parseFloat(document.getElementById('jTp').value) || 0;
+  if (!entry) { alert('Ingresa el precio de entrada'); return; }
+  const slDist = Math.abs(entry - sl);
+  const tpDist = Math.abs(tp - entry);
+  const rr     = slDist > 0 ? parseFloat((tpDist/slDist).toFixed(1)) : 2;
+  const pnl_r  = outcome === 'WIN' ? rr : outcome === 'LOSS' ? -1 : 0;
+  try {
+    const r = await fetch(`${API_BASE}/journal/add_trade`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        pair, signal: dir, entry, sl, tp, rr,
+        outcome, pnl_r, confidence: 80, ml_score: 50, source: 'MANUAL'
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Limpiar formulario
+      document.getElementById('jEntry').value = '';
+      document.getElementById('jSl').value = '';
+      document.getElementById('jTp').value = '';
+      loadJournal();
+    }
+  } catch(e) { console.error('Error registrando trade:', e); }
+}
+
+function renderJournalStats(s) {
+  const el = id => document.getElementById(id);
+  if(el('jWR'))    { el('jWR').textContent = (s.wr||0)+'%'; el('jWR').style.color = s.wr>=50?'#10b981':'#ef4444'; }
+  if(el('jNetR'))  { el('jNetR').textContent = (s.net_r>=0?'+':'')+s.net_r+'R'; el('jNetR').style.color = s.net_r>=0?'#3b82f6':'#ef4444'; }
+  if(el('jTotal')) { el('jTotal').textContent = s.total||0; }
+  if(el('jToday')) { el('jToday').textContent = (s.today_net>=0?'+':'')+s.today_net+'R'; el('jToday').style.color = s.today_net>=0?'#fbbf24':'#ef4444'; }
 }
 
 // Cargar journal al arrancar y cada 5 min

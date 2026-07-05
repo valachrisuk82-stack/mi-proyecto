@@ -2032,6 +2032,36 @@ def scan_smc_all_pairs():
     return results
 
 
+@app.route("/api/journal/add_trade", methods=["POST"])
+def journal_add_trade():
+    """Registra una operación manual en el diario de trading"""
+    try:
+        data = request.get_json(force=True)
+        pair       = data.get("pair", "XAUUSD")
+        signal     = data.get("signal", "LONG")
+        entry      = float(data.get("entry", 0))
+        sl         = float(data.get("sl", 0))
+        tp         = float(data.get("tp", 0))
+        rr         = float(data.get("rr", 2))
+        outcome    = data.get("outcome", "OPEN")
+        pnl_r      = float(data.get("pnl_r", 0))
+        confidence = int(data.get("confidence", 80))
+        ml_score   = int(data.get("ml_score", 50))
+        source     = data.get("source", "MANUAL")
+        trade_id = paper_add_trade(pair, signal, entry, sl, tp, rr, confidence, ml_score)
+        # Si el resultado ya está definido (WIN/LOSS), cerrarlo inmediatamente
+        if outcome in ("WIN", "LOSS") and trade_id:
+            conn = get_db()
+            conn.execute(
+                "UPDATE paper_trades SET outcome=?, pnl_r=?, closed_at=datetime('now') WHERE id=?",
+                (outcome, pnl_r, trade_id)
+            )
+            conn.commit()
+            conn.close()
+        return jsonify({"ok": True, "trade_id": trade_id})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 @app.route("/api/journal/stats")
 def journal_stats_api():
     return jsonify(journal_stats())
