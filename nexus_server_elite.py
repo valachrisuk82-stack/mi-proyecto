@@ -3349,6 +3349,8 @@ def scheduled_reports_monitor():
             hhmm = now_utc.strftime("%H:%M")
 
             sessions = [
+                ("07:00", "🌏 ASIA/LONDRES — Overlap 07:00 GMT"),
+                ("08:00", "🌏 ASIA/LONDRES — Overlap 08:00 GMT"),
                 ("09:30", "🇬🇧 LONDRES — Apertura 9:30 GMT"),
                 ("11:00", "🇬🇧 LONDRES — Confirmación 11:00 GMT"),
                 ("14:00", "🗽 NUEVA YORK — Pre-apertura 14:00 GMT"),
