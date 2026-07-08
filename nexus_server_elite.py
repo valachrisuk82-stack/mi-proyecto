@@ -1066,6 +1066,7 @@ def check_priority_signal(sym, min_confidence=65):
         if not result: return
         sig  = result.get("signal", "WAIT")
         conf = result.get("confidence", 0)
+        print(f'[DEBUG PRIORITY] {sym}: sig={sig} conf={conf} reason={result.get("reason","")}')
         if sig == "WAIT" or conf < min_confidence:
             return
         prev = _priority_alert_state.get(sym, {}).get("signal")
