@@ -1127,7 +1127,8 @@ def get_gold_spot_price():
         bid = float(d[0]["spreadProfilePrices"][0]["bid"])
         ask = float(d[0]["spreadProfilePrices"][0]["ask"])
         return round((bid + ask) / 2, 2)
-    except:
+    except Exception as e:
+        print(f'[SWISSQUOTE GOLD ERROR] {e}')
         return None
 
 def get_forex_spot_price(pair):
@@ -1144,7 +1145,8 @@ def get_forex_spot_price(pair):
         bid = float(d[0]["spreadProfilePrices"][0]["bid"])
         ask = float(d[0]["spreadProfilePrices"][0]["ask"])
         return round((bid + ask) / 2, 5)
-    except:
+    except Exception as e:
+        print(f'[SWISSQUOTE FOREX ERROR] {pair}: {e}')
         return None
 
 def get_global_market_data():
