@@ -34,7 +34,7 @@ CONFIG = {
     "risk_pct":          1.0,
     "kline_tf":          "5m",
     "kline_limit":       200,
-    "refresh_sec":       30,
+    "refresh_sec":       15,
     "min_confidence":    60,
     "trailing_atr_mult": 2.0,  # ATR multiplier for trailing stop
 }
@@ -3239,6 +3239,109 @@ def copy_signal_api(symbol):
     result = get_copy_trading_signal(symbol.upper())
     return jsonify({"ok": True, "result": result})
 
+
+# ══════════════════════════════════════════════════════════════════
+#  MONITOR ULTRARRÁPIDO — BTC y ORO cada 10 segundos
+#  Sin Claude AI — solo técnico puro para señales instantáneas
+# ══════════════════════════════════════════════════════════════════
+_fast_signal_state = {}  # última señal enviada por par
+
+def get_fast_signal(sym):
+    """Señal técnica ultrarrápida — sin IA, basada en EMA + RSI + volumen"""
+    try:
+        ind = cache["indicators"].get(sym, {})
+        if not ind or not ind.get("rsi"): return None
+
+        # Precio en vivo — priorizar webhook de TradingView
+        tv_price = get_tv_price(sym)
+        price = tv_price or float(cache["tickers"].get(sym, {}).get("lastPrice", 0))
+        if sym == "XAUUSD" and not tv_price:
+            price = get_gold_spot_price() or price
+        if not price: return None
+
+        rsi    = ind.get("rsi", 50)
+        ema9   = ind.get("ema9", price)
+        ema21  = ind.get("ema21", price)
+        atr    = ind.get("atr", price * 0.001)
+        macd_h = ind.get("macd", {}).get("hist", 0) or 0
+        vol_r  = ind.get("vol", {}).get("ratio", 1) or 1
+
+        # Separación EMA como % del precio
+        ema_sep = abs(ema9 - ema21) / price * 100
+
+        # Condiciones de entrada estrictas
+        is_gold = sym == "XAUUSD"
+        min_sep = 0.05 if is_gold else 0.03
+
+        signal = None
+        if ema9 > ema21 and ema_sep > min_sep and 35 < rsi < 65 and macd_h > 0:
+            signal = "BUY"
+        elif ema9 < ema21 and ema_sep > min_sep and 35 < rsi < 65 and macd_h < 0:
+            signal = "SELL"
+
+        if not signal: return None
+
+        # SL/TP basado en precio ACTUAL del momento
+        sl_mult = 2.0 if is_gold else 1.5
+        tp_mult = 3.0 if is_gold else 2.5
+        if signal == "BUY":
+            sl = round(price - atr * sl_mult, 4)
+            tp = round(price + atr * tp_mult, 4)
+        else:
+            sl = round(price + atr * sl_mult, 4)
+            tp = round(price - atr * tp_mult, 4)
+
+        rr = round(tp_mult / sl_mult, 1)
+        return {"signal": signal, "price": price, "sl": sl, "tp": tp,
+                "rr": rr, "rsi": round(rsi, 1), "ema_sep": round(ema_sep, 3),
+                "vol_ratio": round(vol_r, 2)}
+    except Exception as e:
+        print(f"  [FAST SIGNAL ERROR] {sym}: {e}")
+        return None
+
+def fast_signal_monitor():
+    """Monitor ultrarrápido — revisa BTC y ORO cada 10 segundos"""
+    FAST_PAIRS = ["XAUUSD", "BTCUSDT"]
+    import time as _t
+    _t.sleep(15)  # esperar que el servidor arranque
+    while True:
+        for sym in FAST_PAIRS:
+            try:
+                result = get_fast_signal(sym)
+                if not result: continue
+
+                sig   = result["signal"]
+                price = result["price"]
+                prev  = _fast_signal_state.get(sym, {})
+
+                # Solo alertar si la señal cambió O si el precio cambió más de 0.1%
+                prev_sig   = prev.get("signal")
+                prev_price = prev.get("price", 0)
+                price_changed = abs(price - prev_price) / max(prev_price, 1) > 0.001
+
+                if sig == prev_sig and not price_changed:
+                    continue
+
+                _fast_signal_state[sym] = result
+                emoji     = "🟢" if sig == "BUY" else "🔴"
+                nice_name = "🥇 ORO (XAUUSD)" if sym == "XAUUSD" else "₿ BITCOIN (BTC)"
+                disclaimer = "" if sym == "XAUUSD" else "\n⚠️ <i>BTC informativo — sin fiabilidad certificada</i>"
+
+                msg = (f"{emoji} <b>SEÑAL {sig} — {nice_name}</b>\n"
+                       f"━━━━━━━━━━━━━━━━━━━━\n"
+                       f"💰 Entrada: <b>${price:,.4f}</b>\n"
+                       f"🛑 Stop Loss: <b>${result['sl']:,.4f}</b>\n"
+                       f"🎯 Take Profit: <b>${result['tp']:,.4f}</b>\n"
+                       f"📐 R:R: <b>1:{result['rr']}</b>\n"
+                       f"📊 RSI: {result['rsi']} | EMA sep: {result['ema_sep']}%\n"
+                       f"🕐 {datetime.now().strftime('%H:%M:%S')} GMT\n"
+                       f"⚡ NEXUS APEX — SEÑAL RÁPIDA{disclaimer}")
+                send_telegram(msg)
+                print(f"  [FAST ALERT] {sym}: {sig} @ ${price:,.4f}")
+            except Exception as e:
+                print(f"  [FAST MONITOR ERROR] {sym}: {e}")
+        _t.sleep(10)
+
 def copy_trading_monitor():
     """Hilo dedicado — revisa la señal certificada de ORO cada 60 segundos"""
     while True:
@@ -3455,6 +3558,7 @@ threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=priority_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
+threading.Thread(target=fast_signal_monitor, daemon=True).start()
 threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
