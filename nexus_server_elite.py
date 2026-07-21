@@ -3128,7 +3128,7 @@ def tv_webhook():
                        f"📐 R:R: <b>1:{rr}</b>\n"
                        f"🤖 Confianza: <b>{conf:.0f}%</b>\n"
                        f"💬 {reason}\n"
-                       f"🕐 {datetime.now().strftime('%%H:%%M')} Londres (TradingView/OANDA)\n"
+                       f"🕐 {datetime.now().strftime('%H:%M')} Londres (TradingView/OANDA)\n"
                        f"⚡ NEXUS APEX")
                 send_telegram(msg)
                 _tv_signal_state[internal] = {"signal": sig, "time": time.time()}
