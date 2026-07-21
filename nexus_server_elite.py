@@ -3081,6 +3081,7 @@ def market_intelligence():
 _tv_prices = {}  # cache de precios recibidos de TradingView
 _tv_secret = os.environ.get("TV_WEBHOOK_SECRET", "nexus_tv_2026")
 
+_tv_signal_state = {}
 @app.route("/api/tv_webhook", methods=["POST"])
 def tv_webhook():
     """Recibe precios en tiempo real desde alertas de TradingView"""
@@ -3094,8 +3095,6 @@ def tv_webhook():
         if not symbol or not price:
             return jsonify({"ok": False, "error": "missing symbol/price"}), 400
         _tv_prices[symbol] = {"price": price, "ts": time.time()}
-        # Si el símbolo coincide con un par interno, sobreescribir el precio en cache
-        # Mapear símbolos comunes de TradingView a los nuestros
         tv_map = {
             "XAUUSD": "XAUUSD", "GOLD": "XAUUSD",
             "BTCUSD": "BTCUSDT", "BTCUSDT": "BTCUSDT",
@@ -3107,6 +3106,34 @@ def tv_webhook():
         if internal in cache.get("tickers", {}):
             cache["tickers"][internal]["lastPrice"] = price
         print(f"[TV] {symbol} → ${price} (cached as {internal})")
+
+        # Señal completa desde Pine Script (BUY/SELL con confianza, SL, TP)
+        sig = data.get("signal")
+        if sig in ("BUY", "SELL"):
+            conf = float(data.get("confidence", 0))
+            sl   = float(data.get("sl", 0))
+            tp   = float(data.get("tp", 0))
+            reason = data.get("reason", "")
+            rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+            prev = _tv_signal_state.get(internal, {}).get("signal")
+            if prev != sig:
+                emoji = "🟢" if sig == "BUY" else "🔴"
+                nice = "ORO (XAUUSD)" if internal == "XAUUSD" else internal
+                msg = (f"{emoji} <b>SEÑAL CERTIFICADA — {sig}</b>\n"
+                       f"━━━━━━━━━━━━━━━━━━━━\n"
+                       f"💎 Activo: <b>{nice}</b>\n"
+                       f"💰 Entrada: <b>${price:,.2f}</b>\n"
+                       f"🛑 Stop Loss: <b>${sl:,.2f}</b>\n"
+                       f"🎯 Take Profit: <b>${tp:,.2f}</b>\n"
+                       f"📐 R:R: <b>1:{rr}</b>\n"
+                       f"🤖 Confianza: <b>{conf:.0f}%</b>\n"
+                       f"💬 {reason}\n"
+                       f"🕐 {datetime.now().strftime('%%H:%%M')} Londres (TradingView/OANDA)\n"
+                       f"⚡ NEXUS APEX")
+                send_telegram(msg)
+                _tv_signal_state[internal] = {"signal": sig, "time": time.time()}
+                print(f"[TV SIGNAL] {internal}: {sig} ({conf}%) enviado a Telegram")
+
         return jsonify({"ok": True, "symbol": internal, "price": price})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
