@@ -1096,6 +1096,125 @@ def check_priority_signal(sym, min_confidence=65):
     except Exception as e:
         print(f"  [PRIORITY ERROR] {sym}: {e}")
 
+
+
+# ══════════════════════════════════════════════════════════════════
+#  TWELVE DATA — Velas reales de oro M1/H1 (reemplaza Yahoo GC=F)
+# ══════════════════════════════════════════════════════════════════
+_twelvedata_cache = {}
+_twelvedata_cache_time = {}
+TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY", "")
+
+def get_twelvedata_gold_klines(interval="1min", outputsize=60):
+    cache_key = f"gold_{interval}"
+    now = time.time()
+    ttl = 150 if interval == "1min" else 900
+    if cache_key in _twelvedata_cache and now - _twelvedata_cache_time.get(cache_key, 0) < ttl:
+        return _twelvedata_cache[cache_key]
+    try:
+        r = requests.get(
+            "https://api.twelvedata.com/time_series",
+            params={"symbol": "XAU/USD", "interval": interval, "outputsize": outputsize, "apikey": TWELVEDATA_API_KEY},
+            timeout=8
+        )
+        d = r.json()
+        if "values" not in d:
+            print(f"[TWELVEDATA ERROR] {d.get('message', d)}")
+            return pd.DataFrame()
+        rows = list(reversed(d["values"]))
+        df = pd.DataFrame(rows)
+        df["time"] = pd.to_datetime(df["datetime"])
+        for col in ["open","high","low","close"]:
+            df[col] = df[col].astype(float)
+        df["volume"] = 0.0
+        _twelvedata_cache[cache_key] = df
+        _twelvedata_cache_time[cache_key] = now
+        return df
+    except Exception as e:
+        print(f"[TWELVEDATA ERROR] {e}")
+        return pd.DataFrame()
+
+# ══════════════════════════════════════════════════════════════════
+#  SEÑAL RÁPIDA DE ORO — sin filtro de volumen, mayor frecuencia
+# ══════════════════════════════════════════════════════════════════
+_gold_freq_state = {}
+
+def check_gold_frequent_signal():
+    try:
+        df_m1 = get_twelvedata_gold_klines("1min", 60)
+        df_h1 = get_twelvedata_gold_klines("1h", 60)
+        if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
+            print(f"[GOLD FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
+            return
+
+        def ema(series, period):
+            return series.ewm(span=period, adjust=False).mean()
+
+        m1_ema9 = ema(df_m1["close"], 9)
+        m1_ema21 = ema(df_m1["close"], 21)
+        m1_last, m1_prev = m1_ema9.iloc[-1], m1_ema9.iloc[-2]
+        m1_21, m1_21p = m1_ema21.iloc[-1], m1_ema21.iloc[-2]
+        m1_cross_bull = m1_prev <= m1_21p and m1_last > m1_21
+        m1_cross_bear = m1_prev >= m1_21p and m1_last < m1_21
+
+        h1_ema9 = ema(df_h1["close"], 9).iloc[-1]
+        h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
+        h1_bull = h1_ema9 > h1_ema21
+        h1_bear = h1_ema9 < h1_ema21
+
+        rsi = calc_rsi(df_m1)
+        atr = calc_atr(df_m1)
+        price = float(df_m1["close"].iloc[-1])
+
+        signal, confidence, reason = "WAIT", 0, ""
+        if h1_bull and m1_cross_bull and rsi < 70:
+            signal, confidence = "BUY", 85
+            reason = f"Cruce EMA M1 alcista confirmado por H1. RSI {rsi:.0f}"
+        elif h1_bear and m1_cross_bear and rsi > 30:
+            signal, confidence = "SELL", 85
+            reason = f"Cruce EMA M1 bajista confirmado por H1. RSI {rsi:.0f}"
+
+        print(f"[GOLD FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} reason={reason}")
+
+        if signal == "WAIT":
+            return
+        prev = _gold_freq_state.get("signal")
+        if prev == signal:
+            return
+
+        sl = price - atr*1.5 if signal == "BUY" else price + atr*1.5
+        tp = price + atr*3.0 if signal == "BUY" else price - atr*3.0
+        rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+        emoji = "🟢" if signal == "BUY" else "🔴"
+        msg = (f"{emoji} <b>SEÑAL RÁPIDA — {signal}</b>\n"
+               f"━━━━━━━━━━━━━━━━━━━━\n"
+               f"💎 Activo: <b>ORO (XAUUSD)</b>\n"
+               f"💰 Entrada: <b>${price:,.2f}</b>\n"
+               f"🛑 Stop Loss: <b>${sl:,.2f}</b>\n"
+               f"🎯 Take Profit: <b>${tp:,.2f}</b>\n"
+               f"📐 R:R: <b>1:{rr}</b>\n"
+               f"🤖 Confianza: <b>{confidence}%</b>\n"
+               f"💬 {reason}\n"
+               f"🕐 {datetime.now().strftime('%H:%M')} Londres (Twelve Data)\n"
+               f"⚡ NEXUS APEX")
+        send_telegram(msg)
+        _gold_freq_state["signal"] = signal
+        _gold_freq_state["time"] = datetime.now()
+        print(f"[GOLD FREQ ALERT] {signal} ({confidence}%) enviado a Telegram")
+    except Exception as e:
+        print(f"[GOLD FREQ ERROR] {e}")
+
+def gold_freq_monitor():
+    while True:
+        check_gold_frequent_signal()
+        time.sleep(60)
+
+@app.route("/api/test_gold_freq")
+def test_gold_freq():
+    check_gold_frequent_signal()
+    return jsonify({"ok": True, "state": _gold_freq_state})
+
+
 def priority_monitor():
     """Hilo dedicado — revisa BTC y ORO cada 60 segundos"""
     PRIORITY_SYMBOLS = ["BTCUSDT", "XAUUSD", "GBPUSD"]  # Solo activos prioritarios
@@ -3587,6 +3706,7 @@ print("═"*58)
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=priority_monitor, daemon=True).start()
+threading.Thread(target=gold_freq_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
 threading.Thread(target=fast_signal_monitor, daemon=True).start()
 threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
