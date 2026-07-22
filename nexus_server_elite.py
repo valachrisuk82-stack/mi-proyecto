@@ -1209,10 +1209,6 @@ def gold_freq_monitor():
         check_gold_frequent_signal()
         time.sleep(60)
 
-@app.route("/api/test_gold_freq")
-def test_gold_freq():
-    check_gold_frequent_signal()
-    return jsonify({"ok": True, "state": _gold_freq_state})
 
 
 def priority_monitor():
@@ -3703,6 +3699,11 @@ print(f"  ML Score:  ACTIVO | Trailing Stop: ACTIVO")
 print(f"  News:      ACTIVO | Order Flow: ACTIVO")
 print(f"  Telegram:  {'✅' if 'TU_API' not in CONFIG['telegram_token'] else '⚠️  Configura token'}")
 print("═"*58)
+@app.route("/api/test_gold_freq")
+def test_gold_freq():
+    check_gold_frequent_signal()
+    return jsonify({"ok": True, "state": _gold_freq_state})
+
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=priority_monitor, daemon=True).start()
