@@ -1105,10 +1105,24 @@ _twelvedata_cache = {}
 _twelvedata_cache_time = {}
 TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY", "")
 
+def get_twelvedata_live_price():
+    """Precio en vivo exacto (no el cierre de una vela ya pasada)"""
+    try:
+        r = requests.get(
+            "https://api.twelvedata.com/price",
+            params={"symbol": "XAU/USD", "apikey": TWELVEDATA_API_KEY},
+            timeout=5
+        )
+        d = r.json()
+        return float(d["price"])
+    except Exception as e:
+        print(f"[TWELVEDATA PRICE ERROR] {e}")
+        return None
+
 def get_twelvedata_gold_klines(interval="1min", outputsize=60):
     cache_key = f"gold_{interval}"
     now = time.time()
-    ttl = 150 if interval == "1min" else 900
+    ttl = 15 if interval == "1min" else 300
     if cache_key in _twelvedata_cache and now - _twelvedata_cache_time.get(cache_key, 0) < ttl:
         return _twelvedata_cache[cache_key]
     try:
@@ -1182,6 +1196,10 @@ def check_gold_frequent_signal():
         if prev == signal:
             return
 
+        # Usar precio EN VIVO para la entrada (no el cierre de una vela ya pasada)
+        live_price = get_twelvedata_live_price()
+        if live_price:
+            price = live_price
         sl = price - atr*1.5 if signal == "BUY" else price + atr*1.5
         tp = price + atr*3.0 if signal == "BUY" else price - atr*3.0
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
@@ -1207,7 +1225,7 @@ def check_gold_frequent_signal():
 def gold_freq_monitor():
     while True:
         check_gold_frequent_signal()
-        time.sleep(60)
+        time.sleep(20)
 
 
 
