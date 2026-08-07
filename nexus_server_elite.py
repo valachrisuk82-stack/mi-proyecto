@@ -1195,6 +1195,12 @@ def check_gold_frequent_signal():
         elif h1_bear and m1_bear and rsi > 25:
             signal, confidence = "SELL", 65
             reason = f"Tendencia bajista establecida (M1+H1 alineados). RSI {rsi:.0f}"
+        elif h1_bull and m1_bear and rsi < 35:
+            signal, confidence = "BUY", 55
+            reason = f"Retroceso en tendencia alcista H1 — oportunidad de entrada. RSI {rsi:.0f}"
+        elif h1_bear and m1_bull and rsi > 65:
+            signal, confidence = "SELL", 55
+            reason = f"Repunte en tendencia bajista H1 — oportunidad de entrada. RSI {rsi:.0f}"
 
         print(f"[GOLD FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} h1_bull={h1_bull} h1_bear={h1_bear} m1_bull={m1_bull} m1_bear={m1_bear} cross_bull={m1_cross_bull} cross_bear={m1_cross_bear} price={price:.2f}")
 
