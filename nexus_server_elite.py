@@ -1248,6 +1248,7 @@ def check_gold_frequent_signal():
                f"🕐 {datetime.now().strftime('%H:%M')} Londres (Twelve Data)\n"
                f"⚡ NEXUS APEX")
         send_telegram(msg)
+        log_signal("XAUUSD", "RAPIDA", signal, price, sl, tp, confidence)
         _gold_freq_state["signal"] = signal
         _gold_freq_state["time"] = datetime.now()
         print(f"[GOLD FREQ ALERT] {signal} ({confidence}%) enviado a Telegram")
@@ -1326,6 +1327,7 @@ def check_btc_frequent_signal():
         ]
         msg = chr(10).join(btc_msg_lines)
         send_telegram(msg)
+        log_signal("BTCUSDT", "RAPIDA", signal, price, sl, tp, confidence)
         _btc_freq_state["signal"] = signal
         _btc_freq_state["time"] = datetime.now()
         print(f"[BTC FREQ ALERT] {signal} ({confidence}%) enviado a Telegram")
@@ -3844,11 +3846,108 @@ def test_gold_freq():
     check_gold_frequent_signal()
     return jsonify({"ok": True, "state": _gold_freq_state})
 
+# ══════════════════════════════════════════════════════════════════
+#  TRACK RECORD — Registro y seguimiento real de cada señal enviada
+# ══════════════════════════════════════════════════════════════════
+import sqlite3
+
+def init_track_db():
+    conn = sqlite3.connect("signals_track.db")
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS signals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT,
+        signal_type TEXT,
+        direction TEXT,
+        entry_price REAL,
+        sl REAL,
+        tp REAL,
+        confidence INTEGER,
+        sent_time TEXT,
+        status TEXT DEFAULT 'OPEN',
+        closed_time TEXT,
+        closed_price REAL
+    )""")
+    conn.commit()
+    conn.close()
+
+def log_signal(symbol, signal_type, direction, entry, sl, tp, confidence):
+    try:
+        conn = sqlite3.connect("signals_track.db")
+        c = conn.cursor()
+        c.execute("INSERT INTO signals (symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status) VALUES (?,?,?,?,?,?,?,?,?)",
+                   (symbol, signal_type, direction, entry, sl, tp, confidence, datetime.now().isoformat(), "OPEN"))
+        conn.commit()
+        conn.close()
+        print(f"[TRACK] Señal registrada: {symbol} {direction} @ {entry}")
+    except Exception as e:
+        print(f"[TRACK LOG ERROR] {e}")
+
+def check_open_signals():
+    conn = sqlite3.connect("signals_track.db")
+    c = conn.cursor()
+    c.execute("SELECT id, symbol, direction, entry_price, sl, tp, sent_time FROM signals WHERE status='OPEN'")
+    rows = c.fetchall()
+    for row in rows:
+        sig_id, symbol, direction, entry, sl, tp, sent_time = row
+        price = None
+        if symbol == "XAUUSD":
+            price = get_twelvedata_live_price()
+        elif symbol == "BTCUSDT":
+            price = get_binance_live_price("BTCUSDT")
+        if not price:
+            continue
+        hit = None
+        if direction == "BUY":
+            if price >= tp:
+                hit = "WIN"
+            elif price <= sl:
+                hit = "LOSS"
+        else:
+            if price <= tp:
+                hit = "WIN"
+            elif price >= sl:
+                hit = "LOSS"
+        sent_dt = datetime.fromisoformat(sent_time)
+        if not hit and (datetime.now() - sent_dt).total_seconds() > 6*3600:
+            hit = "EXPIRED"
+        if hit:
+            c.execute("UPDATE signals SET status=?, closed_time=?, closed_price=? WHERE id=?",
+                       (hit, datetime.now().isoformat(), price, sig_id))
+            print(f"[TRACK] Señal #{sig_id} {symbol} cerrada: {hit} @ {price}")
+    conn.commit()
+    conn.close()
+
+def track_record_monitor():
+    init_track_db()
+    while True:
+        try:
+            check_open_signals()
+        except Exception as e:
+            print(f"[TRACK RECORD ERROR] {e}")
+        time.sleep(30)
+
+@app.route("/api/track_record")
+def api_track_record():
+    conn = sqlite3.connect("signals_track.db")
+    c = conn.cursor()
+    c.execute("SELECT symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status, closed_time, closed_price FROM signals ORDER BY id DESC LIMIT 100")
+    rows = c.fetchall()
+    conn.close()
+    cols = ["symbol","signal_type","direction","entry_price","sl","tp","confidence","sent_time","status","closed_time","closed_price"]
+    signals = [dict(zip(cols, r)) for r in rows]
+    wins = sum(1 for s in signals if s["status"] == "WIN")
+    losses = sum(1 for s in signals if s["status"] == "LOSS")
+    total_closed = wins + losses
+    win_rate = round(wins / total_closed * 100, 1) if total_closed > 0 else 0
+    return jsonify({"ok": True, "win_rate": win_rate, "wins": wins, "losses": losses, "total_closed": total_closed, "signals": signals})
+
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=priority_monitor, daemon=True).start()
 threading.Thread(target=gold_freq_monitor, daemon=True).start()
 threading.Thread(target=btc_freq_monitor, daemon=True).start()
+threading.Thread(target=track_record_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
 threading.Thread(target=fast_signal_monitor, daemon=True).start()
 threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
