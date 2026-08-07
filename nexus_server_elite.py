@@ -1228,7 +1228,6 @@ def check_gold_frequent_signal():
 _btc_freq_state = {}
 
 def get_binance_live_price(symbol="BTCUSDT"):
-    """Precio en vivo exacto de Binance"""
     try:
         r = requests.get(f"{BASE}/ticker/price", params={"symbol": symbol}, timeout=5)
         d = r.json()
@@ -1244,26 +1243,21 @@ def check_btc_frequent_signal():
         if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
             print(f"[BTC FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
-
         def ema(series, period):
             return series.ewm(span=period, adjust=False).mean()
-
         m1_ema9 = ema(df_m1["close"], 9)
         m1_ema21 = ema(df_m1["close"], 21)
         m1_last, m1_prev = m1_ema9.iloc[-1], m1_ema9.iloc[-2]
         m1_21, m1_21p = m1_ema21.iloc[-1], m1_ema21.iloc[-2]
         m1_cross_bull = m1_prev <= m1_21p and m1_last > m1_21
         m1_cross_bear = m1_prev >= m1_21p and m1_last < m1_21
-
         h1_ema9 = ema(df_h1["close"], 9).iloc[-1]
         h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
         h1_bull = h1_ema9 > h1_ema21
         h1_bear = h1_ema9 < h1_ema21
-
         rsi = calc_rsi(df_m1)
         atr = calc_atr(df_m1)
         price = float(df_m1["close"].iloc[-1])
-
         signal, confidence, reason = "WAIT", 0, ""
         if h1_bull and m1_cross_bull and rsi < 70:
             signal, confidence = "BUY", 80
@@ -1271,46 +1265,34 @@ def check_btc_frequent_signal():
         elif h1_bear and m1_cross_bear and rsi > 30:
             signal, confidence = "SELL", 80
             reason = f"Cruce EMA M1 bajista confirmado por H1. RSI {rsi:.0f}"
-
         print(f"[BTC FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} reason={reason}")
-
         if signal == "WAIT":
             return
         prev = _btc_freq_state.get("signal")
         if prev == signal:
             return
-
         live_price = get_binance_live_price("BTCUSDT")
         if live_price:
             price = live_price
-
         sl = price - atr*1.5 if signal == "BUY" else price + atr*1.5
         tp = price + atr*3.0 if signal == "BUY" else price - atr*3.0
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
         emoji = "🟢" if signal == "BUY" else "🔴"
-        msg = (f"{emoji} <b>SEÑAL RÁPIDA — {signal}</b>
-"
-               f"━━━━━━━━━━━━━━━━━━━━
-"
-               f"💎 Activo: <b>BITCOIN (BTC)</b>
-"
-               f"💰 Entrada: <b>${price:,.2f}</b>
-"
-               f"🛑 Stop Loss: <b>${sl:,.2f}</b>
-"
-               f"🎯 Take Profit: <b>${tp:,.2f}</b>
-"
-               f"📐 R:R: <b>1:{rr}</b>
-"
-               f"🤖 Confianza: <b>{confidence}%</b>
-"
-               f"💬 {reason}
-"
-               f"🕐 {datetime.now().strftime('%H:%M')} Londres (Binance)
-"
-               f"⚡ NEXUS APEX
-"
-               f"⚠️ BTC informativo — sin fiabilidad certificada")
+        btc_msg_lines = [
+            f"{emoji} <b>SEÑAL RÁPIDA — {signal}</b>",
+            "━━━━━━━━━━━━━━━━━━━━",
+            f"💎 Activo: <b>BITCOIN (BTC)</b>",
+            f"💰 Entrada: <b>${price:,.2f}</b>",
+            f"🛑 Stop Loss: <b>${sl:,.2f}</b>",
+            f"🎯 Take Profit: <b>${tp:,.2f}</b>",
+            f"📐 R:R: <b>1:{rr}</b>",
+            f"🤖 Confianza: <b>{confidence}%</b>",
+            f"💬 {reason}",
+            f"🕐 {datetime.now().strftime('%H:%M')} Londres (Binance)",
+            f"⚡ NEXUS APEX",
+            f"⚠️ BTC informativo — sin fiabilidad certificada"
+        ]
+        msg = chr(10).join(btc_msg_lines)
         send_telegram(msg)
         _btc_freq_state["signal"] = signal
         _btc_freq_state["time"] = datetime.now()
