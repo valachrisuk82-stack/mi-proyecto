@@ -1153,7 +1153,23 @@ def get_twelvedata_gold_klines(interval="1min", outputsize=60):
 # ══════════════════════════════════════════════════════════════════
 _gold_freq_state = {}
 
+def is_gold_market_open():
+    """Oro cierra viernes 22:00 UTC, reabre domingo 22:00 UTC"""
+    now = datetime.utcnow()
+    weekday = now.weekday()  # 0=lunes ... 5=sabado, 6=domingo
+    hour = now.hour
+    if weekday == 5:  # sabado completo
+        return False
+    if weekday == 6 and hour < 22:  # domingo antes de las 22:00 UTC
+        return False
+    if weekday == 4 and hour >= 22:  # viernes despues de las 22:00 UTC
+        return False
+    return True
+
 def check_gold_frequent_signal():
+    if not is_gold_market_open():
+        return
+
     try:
         df_m1 = get_twelvedata_gold_klines("1min", 60)
         df_h1 = get_twelvedata_gold_klines("1h", 60)
