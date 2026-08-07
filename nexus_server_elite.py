@@ -1180,20 +1180,30 @@ def check_gold_frequent_signal():
         atr = calc_atr(df_m1)
         price = float(df_m1["close"].iloc[-1])
 
+        m1_bull = m1_last > m1_21
+        m1_bear = m1_last < m1_21
         signal, confidence, reason = "WAIT", 0, ""
-        if h1_bull and m1_cross_bull and rsi < 70:
+        if h1_bull and m1_cross_bull and rsi < 75:
             signal, confidence = "BUY", 85
             reason = f"Cruce EMA M1 alcista confirmado por H1. RSI {rsi:.0f}"
-        elif h1_bear and m1_cross_bear and rsi > 30:
+        elif h1_bear and m1_cross_bear and rsi > 25:
             signal, confidence = "SELL", 85
             reason = f"Cruce EMA M1 bajista confirmado por H1. RSI {rsi:.0f}"
+        elif h1_bull and m1_bull and rsi < 75:
+            signal, confidence = "BUY", 65
+            reason = f"Tendencia alcista establecida (M1+H1 alineados). RSI {rsi:.0f}"
+        elif h1_bear and m1_bear and rsi > 25:
+            signal, confidence = "SELL", 65
+            reason = f"Tendencia bajista establecida (M1+H1 alineados). RSI {rsi:.0f}"
 
         print(f"[GOLD FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} reason={reason}")
 
         if signal == "WAIT":
             return
         prev = _gold_freq_state.get("signal")
-        if prev == signal:
+        prev_time = _gold_freq_state.get("time")
+        cooldown_min = 30
+        if prev == signal and prev_time and (datetime.now() - prev_time).total_seconds() < cooldown_min * 60:
             return
 
         # Usar precio EN VIVO para la entrada (no el cierre de una vela ya pasada)
