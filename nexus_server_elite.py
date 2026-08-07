@@ -3408,6 +3408,8 @@ def get_copy_trading_signal(pair="XAUUSD"):
     """
     import time as _t
     now = _t.time()
+    if pair == "XAUUSD" and not is_gold_market_open():
+        return {"signal": "WAIT", "confidence": 0, "reason": "Mercado de oro cerrado (fin de semana)"}
     if pair in _copy_signal_cache and now - _copy_signal_time.get(pair, 0) < 60:
         return _copy_signal_cache[pair]
     try:
