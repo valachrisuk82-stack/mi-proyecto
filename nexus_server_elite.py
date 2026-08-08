@@ -1037,8 +1037,10 @@ def update_all():
             rr = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
             emoji = "🟢" if sig=="BUY" else "🔴"
             rr_real = round(abs(tp-price)/max(0.0001,abs(price-sl)), 1)
-            msg = tg_alert(pair, sig, conf, price, sl, tp, rr_real, sl, f"EMA 9/21 M1+H1 alineados", ml["ml_score"], 0)
-            send_telegram(msg)
+            # DESACTIVADO: ruido de altcoins no relacionadas al negocio (oro/BTC)
+            # msg = tg_alert(pair, sig, conf, price, sl, tp, rr_real, sl, f"EMA 9/21 M1+H1 alineados", ml["ml_score"], 0)
+            # send_telegram(msg)
+            pass
             cache["last_alerts"][pair] = {"signal": sig, "time": datetime.now()}
             cache["history"].insert(0, {
                 "time": datetime.now().strftime("%H:%M:%S"),
@@ -4012,7 +4014,7 @@ def api_track_record():
 
 threading.Thread(target=update_all, daemon=True).start()
 threading.Thread(target=bg_updater, daemon=True).start()
-threading.Thread(target=priority_monitor, daemon=True).start()
+# threading.Thread(target=priority_monitor, daemon=True).start()  # DESACTIVADO: solo GBPUSD, fuera del negocio actual
 threading.Thread(target=gold_freq_monitor, daemon=True).start()
 threading.Thread(target=btc_freq_monitor, daemon=True).start()
 threading.Thread(target=track_record_monitor, daemon=True).start()
