@@ -444,6 +444,28 @@ def calc_rsi(df, period=14):
     rs    = gain / loss.replace(0, np.nan)
     return round(float((100 - 100/(1+rs)).iloc[-1]), 2)
 
+def calc_adx(df, period=14):
+    """ADX: fuerza de la tendencia. <20 = mercado lateral, >25 = tendencia fuerte"""
+    try:
+        high, low, close = df["high"], df["low"], df["close"]
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(period).mean()
+        plus_di = 100 * (plus_dm.rolling(period).mean() / atr.replace(0, np.nan))
+        minus_di = 100 * (minus_dm.rolling(period).mean() / atr.replace(0, np.nan))
+        dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+        adx = dx.rolling(period).mean()
+        val = adx.iloc[-1]
+        return round(float(val), 2) if not pd.isna(val) else 15.0
+    except Exception:
+        return 15.0
+
 def calc_atr(df, period=14):
     high, low, close = df["high"], df["low"], df["close"]
     tr = pd.concat([
@@ -1194,10 +1216,16 @@ def check_gold_frequent_signal():
 
         rsi = calc_rsi(df_m1)
         atr = calc_atr(df_m1)
+        adx = calc_adx(df_h1)
         price = float(df_m1["close"].iloc[-1])
 
         m1_bull = m1_last > m1_21
         m1_bear = m1_last < m1_21
+
+        if adx < 20:
+            print(f"[GOLD FREQ] Mercado lateral (ADX={adx}) - sin señal")
+            return
+
         signal, confidence, reason = "WAIT", 0, ""
         if h1_bull and m1_cross_bull and rsi < 75:
             signal, confidence = "BUY", 85
@@ -1290,7 +1318,11 @@ def check_btc_frequent_signal():
         h1_bear = h1_ema9 < h1_ema21
         rsi = calc_rsi(df_m1)
         atr = calc_atr(df_m1)
+        adx = calc_adx(df_h1)
         price = float(df_m1["close"].iloc[-1])
+        if adx < 20:
+            print(f"[BTC FREQ] Mercado lateral (ADX={adx}) - sin señal")
+            return
         signal, confidence, reason = "WAIT", 0, ""
         if h1_bull and m1_cross_bull and rsi < 70:
             signal, confidence = "BUY", 80
