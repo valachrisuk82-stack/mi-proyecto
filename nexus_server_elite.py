@@ -4017,7 +4017,7 @@ threading.Thread(target=gold_freq_monitor, daemon=True).start()
 threading.Thread(target=btc_freq_monitor, daemon=True).start()
 threading.Thread(target=track_record_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
-threading.Thread(target=fast_signal_monitor, daemon=True).start()
+# threading.Thread(target=fast_signal_monitor, daemon=True).start()  # DESACTIVADO: redundante con gold_freq_monitor/btc_freq_monitor
 threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
 threading.Thread(target=news_updater, daemon=True).start()
 threading.Thread(target=smc_scanner, daemon=True).start()
