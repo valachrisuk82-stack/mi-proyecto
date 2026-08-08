@@ -1334,7 +1334,7 @@ def check_btc_frequent_signal():
         elif h1_bear and m1_cross_bear and rsi > 30:
             signal, confidence = "SELL", 80
             reason = f"Cruce EMA M1 bajista confirmado por H1. RSI {rsi:.0f}"
-        print(f"[BTC FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} reason={reason}")
+        print(f"[BTC FREQ] sig={signal} conf={confidence} rsi={rsi:.2f} adx={adx:.1f} reason={reason}")
         if signal == "WAIT":
             return
         prev = _btc_freq_state.get("signal")
