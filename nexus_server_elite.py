@@ -442,7 +442,11 @@ def calc_rsi(df, period=14):
     gain  = delta.where(delta > 0, 0).rolling(period).mean()
     loss  = (-delta.where(delta < 0, 0)).rolling(period).mean()
     rs    = gain / loss.replace(0, np.nan)
-    return round(float((100 - 100/(1+rs)).iloc[-1]), 2)
+    result = (100 - 100/(1+rs)).iloc[-1]
+    if pd.isna(result):
+        print(f"[RSI DEBUG] resultado NaN - gain_last={gain.iloc[-1]} loss_last={loss.iloc[-1]} closes_tail={list(df[chr(39)+chr(99)+chr(108)+chr(111)+chr(115)+chr(101)+chr(39)].tail(5))}")
+        return 50.0
+    return round(float(result), 2)
 
 def calc_adx(df, period=14):
     """ADX: fuerza de la tendencia. <20 = mercado lateral, >25 = tendencia fuerte"""
