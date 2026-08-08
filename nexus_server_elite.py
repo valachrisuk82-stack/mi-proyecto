@@ -1179,6 +1179,30 @@ def get_twelvedata_gold_klines(interval="1min", outputsize=60):
 # ══════════════════════════════════════════════════════════════════
 _gold_freq_state = {}
 
+# ══════════════════════════════════════════════════════════════════
+#  CALENDARIO DE NOTICIAS DE ALTO IMPACTO — actualizar manualmente cada mes
+#  Fuente: federalreserve.gov (FOMC), bls.gov (CPI/NFP) — horas en UTC
+# ══════════════════════════════════════════════════════════════════
+HIGH_IMPACT_EVENTS_UTC = [
+    ("2026-08-12 12:30", "CPI"),
+    ("2026-09-04 12:30", "NFP"),
+    ("2026-09-16 18:00", "FOMC"),
+    ("2026-10-02 12:30", "NFP"),
+    ("2026-10-28 18:00", "FOMC"),
+    ("2026-11-06 13:30", "NFP"),
+    ("2026-12-04 13:30", "NFP"),
+    ("2026-12-09 19:00", "FOMC"),
+]
+
+def is_near_high_impact_news(buffer_minutes=30):
+    now = datetime.utcnow()
+    for event_str, name in HIGH_IMPACT_EVENTS_UTC:
+        event_time = datetime.strptime(event_str, "%Y-%m-%d %H:%M")
+        diff_minutes = abs((now - event_time).total_seconds()) / 60
+        if diff_minutes <= buffer_minutes:
+            return True, name
+    return False, None
+
 def is_gold_market_open():
     """Oro cierra viernes 22:00 UTC, reabre domingo 22:00 UTC"""
     now = datetime.utcnow()
@@ -1194,6 +1218,10 @@ def is_gold_market_open():
 
 def check_gold_frequent_signal():
     if not is_gold_market_open():
+        return
+    near_news, news_name = is_near_high_impact_news()
+    if near_news:
+        print(f"[GOLD FREQ] Pausado por noticia de alto impacto: {news_name}")
         return
 
     try:
@@ -1302,6 +1330,10 @@ def get_binance_live_price(symbol="BTCUSDT"):
         return None
 
 def check_btc_frequent_signal():
+    near_news, news_name = is_near_high_impact_news()
+    if near_news:
+        print(f"[BTC FREQ] Pausado por noticia de alto impacto: {news_name}")
+        return
     try:
         df_m1 = get_klines("BTCUSDT", "1m", 60)
         df_h1 = get_klines("BTCUSDT", "1h", 60)
