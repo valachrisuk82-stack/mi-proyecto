@@ -3921,8 +3921,10 @@ def test_gold_freq():
 # ══════════════════════════════════════════════════════════════════
 import sqlite3
 
+TRACK_DB_PATH = os.path.join(os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "."), "signals_track.db")
+
 def init_track_db():
-    conn = sqlite3.connect("signals_track.db")
+    conn = sqlite3.connect(TRACK_DB_PATH)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS signals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3943,7 +3945,7 @@ def init_track_db():
 
 def log_signal(symbol, signal_type, direction, entry, sl, tp, confidence):
     try:
-        conn = sqlite3.connect("signals_track.db")
+        conn = sqlite3.connect(TRACK_DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO signals (symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status) VALUES (?,?,?,?,?,?,?,?,?)",
                    (symbol, signal_type, direction, entry, sl, tp, confidence, datetime.now().isoformat(), "OPEN"))
@@ -3954,7 +3956,7 @@ def log_signal(symbol, signal_type, direction, entry, sl, tp, confidence):
         print(f"[TRACK LOG ERROR] {e}")
 
 def check_open_signals():
-    conn = sqlite3.connect("signals_track.db")
+    conn = sqlite3.connect(TRACK_DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, symbol, direction, entry_price, sl, tp, sent_time FROM signals WHERE status='OPEN'")
     rows = c.fetchall()
@@ -3999,7 +4001,7 @@ def track_record_monitor():
 
 @app.route("/api/track_record")
 def api_track_record():
-    conn = sqlite3.connect("signals_track.db")
+    conn = sqlite3.connect(TRACK_DB_PATH)
     c = conn.cursor()
     c.execute("SELECT symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status, closed_time, closed_price FROM signals ORDER BY id DESC LIMIT 100")
     rows = c.fetchall()
