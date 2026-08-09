@@ -1377,8 +1377,11 @@ def check_btc_frequent_signal():
         live_price = get_binance_live_price("BTCUSDT")
         if live_price:
             price = live_price
-        sl = price - atr*1.5 if signal == "BUY" else price + atr*1.5
-        tp = price + atr*3.0 if signal == "BUY" else price - atr*3.0
+        # SL/TP con minimo de distancia (0.15% del precio) para evitar stops demasiado ajustados
+        sl_distance = max(atr*2.0, price*0.0015)
+        tp_distance = sl_distance * 2.0
+        sl = price - sl_distance if signal == "BUY" else price + sl_distance
+        tp = price + tp_distance if signal == "BUY" else price - tp_distance
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
         emoji = "🟢" if signal == "BUY" else "🔴"
         btc_msg_lines = [
