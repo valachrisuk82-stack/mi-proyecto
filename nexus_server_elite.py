@@ -1294,9 +1294,16 @@ def check_gold_frequent_signal():
         live_price = get_twelvedata_live_price()
         if live_price:
             price = live_price
-        sl = price - atr*1.5 if signal == "BUY" else price + atr*1.5
-        tp = price + atr*3.0 if signal == "BUY" else price - atr*3.0
+        # SL/TP con minimo de distancia (0.15% del precio) para evitar stops demasiado ajustados
+        sl_distance = max(atr*2.0, price*0.0015)
+        tp_distance = sl_distance * 2.0
+        sl = price - sl_distance if signal == "BUY" else price + sl_distance
+        tp = price + tp_distance if signal == "BUY" else price - tp_distance
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+        if is_recent_duplicate_signal("XAUUSD", signal, price):
+            print(f"[GOLD FREQ] Duplicado detectado, omitiendo envio")
+            return
+
         emoji = "🟢" if signal == "BUY" else "🔴"
         msg = (f"{emoji} <b>SEÑAL RÁPIDA — {signal}</b>\n"
                f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -1383,6 +1390,10 @@ def check_btc_frequent_signal():
         sl = price - sl_distance if signal == "BUY" else price + sl_distance
         tp = price + tp_distance if signal == "BUY" else price - tp_distance
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+        if is_recent_duplicate_signal("BTCUSDT", signal, price):
+            print(f"[BTC FREQ] Duplicado detectado, omitiendo envio")
+            return
+
         emoji = "🟢" if signal == "BUY" else "🔴"
         btc_msg_lines = [
             f"{emoji} <b>SEÑAL RÁPIDA — {signal}</b>",
@@ -3945,6 +3956,27 @@ def init_track_db():
     )""")
     conn.commit()
     conn.close()
+
+def is_recent_duplicate_signal(symbol, direction, entry_price, window_seconds=120, tolerance_pct=0.001):
+    """Evita duplicados si dos procesos (deploy viejo+nuevo solapados) mandan la misma señal"""
+    try:
+        conn = sqlite3.connect(TRACK_DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT entry_price, sent_time FROM signals WHERE symbol=? AND direction=? ORDER BY id DESC LIMIT 3", (symbol, direction))
+        rows = c.fetchall()
+        conn.close()
+        now = datetime.now()
+        for ep, st in rows:
+            try:
+                sent_dt = datetime.fromisoformat(st)
+            except Exception:
+                continue
+            if (now - sent_dt).total_seconds() <= window_seconds and abs(ep - entry_price) / max(entry_price, 0.0001) < tolerance_pct:
+                return True
+        return False
+    except Exception as e:
+        print(f"[DUPLICATE CHECK ERROR] {e}")
+        return False
 
 def log_signal(symbol, signal_type, direction, entry, sl, tp, confidence):
     try:
