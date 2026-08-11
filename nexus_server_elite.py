@@ -1256,7 +1256,7 @@ def check_gold_frequent_signal():
         m1_bull = m1_last > m1_21
         m1_bear = m1_last < m1_21
 
-        if adx < 20:
+        if adx < 25:
             print(f"[GOLD FREQ] Mercado lateral (ADX={adx}) - sin señal")
             return
 
@@ -1273,12 +1273,11 @@ def check_gold_frequent_signal():
         elif h1_bear and m1_bear and rsi > 25:
             signal, confidence = "SELL", 65
             reason = f"Tendencia bajista establecida (M1+H1 alineados). RSI {rsi:.0f}"
-        elif h1_bull and m1_bear and rsi < 35:
-            signal, confidence = "BUY", 55
-            reason = f"Retroceso en tendencia alcista H1 — oportunidad de entrada. RSI {rsi:.0f}"
-        elif h1_bear and m1_bull and rsi > 65:
-            signal, confidence = "SELL", 55
-            reason = f"Repunte en tendencia bajista H1 — oportunidad de entrada. RSI {rsi:.0f}"
+        # PAUSADO: nivel de confianza 55% (buy the dip) - generaba demasiadas señales falsas en mercado lateral
+        # elif h1_bull and m1_bear and rsi < 35:
+        #     signal, confidence = "BUY", 55
+        # elif h1_bear and m1_bull and rsi > 65:
+        #     signal, confidence = "SELL", 55
 
         print(f"[GOLD FREQ] sig={signal} conf={confidence} rsi={rsi:.0f} h1_bull={h1_bull} h1_bear={h1_bear} m1_bull={m1_bull} m1_bear={m1_bear} cross_bull={m1_cross_bull} cross_bear={m1_cross_bear} price={price:.2f}")
 
@@ -1365,7 +1364,7 @@ def check_btc_frequent_signal():
         atr = calc_atr(df_m1)
         adx = calc_adx(df_h1)
         price = float(df_m1["close"].iloc[-1])
-        if adx < 20:
+        if adx < 25:
             print(f"[BTC FREQ] Mercado lateral (ADX={adx}) - sin señal")
             return
         signal, confidence, reason = "WAIT", 0, ""
