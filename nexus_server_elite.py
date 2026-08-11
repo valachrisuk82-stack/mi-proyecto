@@ -1150,7 +1150,7 @@ def get_twelvedata_live_price():
 def get_twelvedata_gold_klines(interval="1min", outputsize=60):
     cache_key = f"gold_{interval}"
     now = time.time()
-    ttl = 15 if interval == "1min" else 300
+    ttl = 8 if interval == "1min" else 300
     if cache_key in _twelvedata_cache and now - _twelvedata_cache_time.get(cache_key, 0) < ttl:
         return _twelvedata_cache[cache_key]
     try:
@@ -1421,12 +1421,12 @@ def check_btc_frequent_signal():
 def btc_freq_monitor():
     while True:
         check_btc_frequent_signal()
-        time.sleep(20)
+        time.sleep(10)
 
 def gold_freq_monitor():
     while True:
         check_gold_frequent_signal()
-        time.sleep(20)
+        time.sleep(10)
 
 
 
