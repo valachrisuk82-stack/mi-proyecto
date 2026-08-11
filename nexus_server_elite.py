@@ -1775,9 +1775,11 @@ def klines(symbol):
     sym   = symbol.upper()
     tf    = request.args.get("tf", CONFIG["kline_tf"])
     limit = int(request.args.get("limit",120))
-    if sym in ALL_EXTERNAL:
+    if sym == "XAUUSD":
+        td_interval = "1min" if tf == "1m" else "1h" if tf == "1h" else "1min"
+        df = get_twelvedata_gold_klines(td_interval, max(limit, 60))
+    elif sym in ALL_EXTERNAL:
         yf_ticker = ALL_EXTERNAL[sym]["ticker"]
-        # Yahoo no tiene M1 real para activos externos — forzar mínimo 5m
         ext_tf = tf if tf not in ["1m"] else "5m"
         df = get_yahoo_klines_simple(yf_ticker, ext_tf)
     else:
@@ -3580,6 +3582,15 @@ def get_copy_trading_signal(pair="XAUUSD"):
         if signal != "WAIT":
             prev = _copy_signal_cache.get(pair + "_prev_sig")
             if prev != signal:
+                # Anclar al precio EN VIVO (no la vela ya cerrada) manteniendo la misma distancia SL/TP
+                live_price = get_twelvedata_live_price()
+                if live_price:
+                    sl_dist = abs(price - sl)
+                    tp_dist = abs(tp - price)
+                    price = live_price
+                    sl = price - sl_dist if signal == "BUY" else price + sl_dist
+                    tp = price + tp_dist if signal == "BUY" else price - tp_dist
+                    rr = round(abs(tp - price) / max(0.0001, abs(price - sl)), 2)
                 emoji = "🟢" if signal == "BUY" else "🔴"
                 msg = (f"{emoji} <b>SEÑAL CERTIFICADA COPY TRADING</b>\n"
                        f"━━━━━━━━━━━━━━━━━━━━\n"
