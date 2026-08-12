@@ -1238,10 +1238,16 @@ def check_gold_frequent_signal():
 
         m1_ema9 = ema(df_m1["close"], 9)
         m1_ema21 = ema(df_m1["close"], 21)
+        m1_ema3 = ema(df_m1["close"], 3)
         m1_last, m1_prev = m1_ema9.iloc[-1], m1_ema9.iloc[-2]
         m1_21, m1_21p = m1_ema21.iloc[-1], m1_ema21.iloc[-2]
-        m1_cross_bull = m1_prev <= m1_21p and m1_last > m1_21
-        m1_cross_bear = m1_prev >= m1_21p and m1_last < m1_21
+        m1_3, m1_3p = m1_ema3.iloc[-1], m1_ema3.iloc[-2]
+        stack_bull_now = m1_3 > m1_last > m1_21
+        stack_bear_now = m1_3 < m1_last < m1_21
+        stack_bull_prev = m1_3p > m1_prev > m1_21p
+        stack_bear_prev = m1_3p < m1_prev < m1_21p
+        m1_cross_bull = stack_bull_now and not stack_bull_prev
+        m1_cross_bear = stack_bear_now and not stack_bear_prev
 
         h1_ema9 = ema(df_h1["close"], 9).iloc[-1]
         h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
@@ -1267,12 +1273,9 @@ def check_gold_frequent_signal():
         elif h1_bear and m1_cross_bear and rsi > 25:
             signal, confidence = "SELL", 85
             reason = f"Cruce EMA M1 bajista confirmado por H1. RSI {rsi:.0f}"
-        elif h1_bull and m1_bull and rsi < 75:
-            signal, confidence = "BUY", 65
-            reason = f"Tendencia alcista establecida (M1+H1 alineados). RSI {rsi:.0f}"
-        elif h1_bear and m1_bear and rsi > 25:
-            signal, confidence = "SELL", 65
-            reason = f"Tendencia bajista establecida (M1+H1 alineados). RSI {rsi:.0f}"
+        # PAUSADO: nivel de tendencia establecida
+        # elif h1_bull and m1_bull and rsi < 75:
+        #     signal, confidence = "BUY", 65
         # PAUSADO: nivel de confianza 55% (buy the dip) - generaba demasiadas señales falsas en mercado lateral
         # elif h1_bull and m1_bear and rsi < 35:
         #     signal, confidence = "BUY", 55
