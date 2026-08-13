@@ -1353,10 +1353,14 @@ def check_btc_frequent_signal():
             return series.ewm(span=period, adjust=False).mean()
         m1_ema9 = ema(df_m1["close"], 9)
         m1_ema21 = ema(df_m1["close"], 21)
+        m1_ema3 = ema(df_m1["close"], 3)
         m1_last, m1_prev = m1_ema9.iloc[-1], m1_ema9.iloc[-2]
         m1_21, m1_21p = m1_ema21.iloc[-1], m1_ema21.iloc[-2]
-        m1_cross_bull = m1_prev <= m1_21p and m1_last > m1_21
-        m1_cross_bear = m1_prev >= m1_21p and m1_last < m1_21
+        # EMA3 SOLA (validada por backtest: 46.2% vs 35.1% de la EMA9/21, ~40 señales/2 meses)
+        m1_3, m1_3p = m1_ema3.iloc[-1], m1_ema3.iloc[-2]
+        close_last, close_prev = df_m1["close"].iloc[-1], df_m1["close"].iloc[-2]
+        m1_cross_bull = close_prev <= m1_3p and close_last > m1_3
+        m1_cross_bear = close_prev >= m1_3p and close_last < m1_3
         h1_ema9 = ema(df_h1["close"], 9).iloc[-1]
         h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
         h1_bull = h1_ema9 > h1_ema21
