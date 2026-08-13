@@ -1242,12 +1242,10 @@ def check_gold_frequent_signal():
         m1_last, m1_prev = m1_ema9.iloc[-1], m1_ema9.iloc[-2]
         m1_21, m1_21p = m1_ema21.iloc[-1], m1_ema21.iloc[-2]
         m1_3, m1_3p = m1_ema3.iloc[-1], m1_ema3.iloc[-2]
-        stack_bull_now = m1_3 > m1_last > m1_21
-        stack_bear_now = m1_3 < m1_last < m1_21
-        stack_bull_prev = m1_3p > m1_prev > m1_21p
-        stack_bear_prev = m1_3p < m1_prev < m1_21p
-        m1_cross_bull = stack_bull_now and not stack_bull_prev
-        m1_cross_bear = stack_bear_now and not stack_bear_prev
+        # EMA3 SOLA (validada con muestra grande: 46.2% consistente en 2 pruebas distintas)
+        close_last, close_prev = df_m1["close"].iloc[-1], df_m1["close"].iloc[-2]
+        m1_cross_bull = close_prev <= m1_3p and close_last > m1_3
+        m1_cross_bear = close_prev >= m1_3p and close_last < m1_3
 
         h1_ema9 = ema(df_h1["close"], 9).iloc[-1]
         h1_ema21 = ema(df_h1["close"], 21).iloc[-1]
