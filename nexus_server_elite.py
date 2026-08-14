@@ -1233,6 +1233,9 @@ def check_gold_frequent_signal():
             print(f"[GOLD FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
 
+        # Descartar la ultima vela M1 - puede seguir formandose (evita señales que se deshacen)
+        df_m1 = df_m1.iloc[:-1].reset_index(drop=True)
+
         def ema(series, period):
             return series.ewm(span=period, adjust=False).mean()
 
@@ -1349,6 +1352,8 @@ def check_btc_frequent_signal():
         if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
             print(f"[BTC FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
+        # Descartar la ultima vela M1 - puede seguir formandose (evita señales que se deshacen)
+        df_m1 = df_m1.iloc[:-1].reset_index(drop=True)
         def ema(series, period):
             return series.ewm(span=period, adjust=False).mean()
         m1_ema9 = ema(df_m1["close"], 9)
