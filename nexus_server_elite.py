@@ -4045,12 +4045,15 @@ def check_open_signals():
     conn.commit()
     conn.close()
 
-def get_weekly_stats():
+def get_weekly_stats(symbol_filter=None):
     from datetime import timedelta
     conn = sqlite3.connect(TRACK_DB_PATH)
     c = conn.cursor()
     week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    c.execute("SELECT symbol, status FROM signals WHERE sent_time >= ? AND status IN ('WIN','LOSS')", (week_ago,))
+    if symbol_filter:
+        c.execute("SELECT symbol, status FROM signals WHERE sent_time >= ? AND symbol = ? AND status IN ('WIN','LOSS')", (week_ago, symbol_filter))
+    else:
+        c.execute("SELECT symbol, status FROM signals WHERE sent_time >= ? AND status IN ('WIN','LOSS')", (week_ago,))
     rows = c.fetchall()
     conn.close()
     stats = {}
@@ -4059,48 +4062,49 @@ def get_weekly_stats():
         stats[symbol][status] += 1
     return stats
 
-def send_weekly_report():
+def send_symbol_weekly_report(symbol, nice_name, title):
     try:
-        stats = get_weekly_stats()
-        total_wins = sum(s["WIN"] for s in stats.values())
-        total_losses = sum(s["LOSS"] for s in stats.values())
-        total = total_wins + total_losses
-        wr = round(total_wins / total * 100, 1) if total else 0
+        stats = get_weekly_stats(symbol_filter=symbol)
+        s = stats.get(symbol, {"WIN": 0, "LOSS": 0})
+        total = s["WIN"] + s["LOSS"]
+        wr = round(s["WIN"] / total * 100, 1) if total else 0
         lines = [
-            "📊 <b>REPORTE SEMANAL — TRACK RECORD</b>",
+            f"📊 <b>{title}</b>",
             "━━━━━━━━━━━━━━━━━━━━",
-            f"✅ Ganadas: <b>{total_wins}</b>",
-            f"❌ Perdidas: <b>{total_losses}</b>",
+            f"{nice_name}",
+            f"✅ Ganadas: <b>{s[chr(87)+chr(73)+chr(78)]}</b>",
+            f"❌ Perdidas: <b>{s[chr(76)+chr(79)+chr(83)+chr(83)]}</b>",
             f"🎯 Win rate: <b>{wr}%</b>",
-            ""
+            f"📈 Total señales: <b>{total}</b>",
+            "",
+            "⚡ NEXUS APEX"
         ]
-        for symbol, s in stats.items():
-            t = s["WIN"] + s["LOSS"]
-            swr = round(s["WIN"] / t * 100, 1) if t else 0
-            nice = "🥇 ORO" if symbol == "XAUUSD" else "₿ BITCOIN" if symbol == "BTCUSDT" else symbol
-            lines.append(f"{nice}: {s[chr(39)+chr(87)+chr(73)+chr(78)+chr(39)]}W / {s[chr(39)+chr(76)+chr(79)+chr(83)+chr(83)+chr(39)]}L ({swr}%)")
-        lines.append("")
-        lines.append("⚡ NEXUS APEX")
         msg = chr(10).join(lines)
         send_telegram(msg)
-        print("[WEEKLY REPORT] Enviado a Telegram")
+        print(f"[WEEKLY REPORT] {symbol} enviado a Telegram")
     except Exception as e:
-        print(f"[WEEKLY REPORT ERROR] {e}")
+        print(f"[WEEKLY REPORT ERROR] {symbol}: {e}")
 
-_last_weekly_report_date = None
+_last_gold_report_week = None
+_last_btc_report_week = None
 
 def weekly_report_monitor():
-    global _last_weekly_report_date
+    global _last_gold_report_week, _last_btc_report_week
     while True:
         try:
             now = datetime.utcnow()
-            today_str = now.strftime("%Y-%m-%d")
-            if now.weekday() == 6 and now.hour == 18 and _last_weekly_report_date != today_str:
-                send_weekly_report()
-                _last_weekly_report_date = today_str
+            week_id = now.strftime("%Y-W%W")
+            # ORO: viernes 22:30 UTC (23:30 Londres BST)
+            if now.weekday() == 4 and now.hour == 22 and 30 <= now.minute < 35 and _last_gold_report_week != week_id:
+                send_symbol_weekly_report("XAUUSD", "🥇 ORO (XAUUSD)", "REPORTE SEMANAL ORO — Cierre viernes")
+                _last_gold_report_week = week_id
+            # BITCOIN: domingo 22:00 UTC (23:00 Londres BST)
+            if now.weekday() == 6 and now.hour == 22 and 0 <= now.minute < 5 and _last_btc_report_week != week_id:
+                send_symbol_weekly_report("BTCUSDT", "₿ BITCOIN (BTCUSDT)", "REPORTE SEMANAL BITCOIN — Domingo")
+                _last_btc_report_week = week_id
         except Exception as e:
             print(f"[WEEKLY REPORT MONITOR ERROR] {e}")
-        time.sleep(1800)
+        time.sleep(300)
 
 def track_record_monitor():
     init_track_db()
