@@ -4045,6 +4045,63 @@ def check_open_signals():
     conn.commit()
     conn.close()
 
+def get_weekly_stats():
+    from datetime import timedelta
+    conn = sqlite3.connect(TRACK_DB_PATH)
+    c = conn.cursor()
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    c.execute("SELECT symbol, status FROM signals WHERE sent_time >= ? AND status IN ('WIN','LOSS')", (week_ago,))
+    rows = c.fetchall()
+    conn.close()
+    stats = {}
+    for symbol, status in rows:
+        stats.setdefault(symbol, {"WIN": 0, "LOSS": 0})
+        stats[symbol][status] += 1
+    return stats
+
+def send_weekly_report():
+    try:
+        stats = get_weekly_stats()
+        total_wins = sum(s["WIN"] for s in stats.values())
+        total_losses = sum(s["LOSS"] for s in stats.values())
+        total = total_wins + total_losses
+        wr = round(total_wins / total * 100, 1) if total else 0
+        lines = [
+            "📊 <b>REPORTE SEMANAL — TRACK RECORD</b>",
+            "━━━━━━━━━━━━━━━━━━━━",
+            f"✅ Ganadas: <b>{total_wins}</b>",
+            f"❌ Perdidas: <b>{total_losses}</b>",
+            f"🎯 Win rate: <b>{wr}%</b>",
+            ""
+        ]
+        for symbol, s in stats.items():
+            t = s["WIN"] + s["LOSS"]
+            swr = round(s["WIN"] / t * 100, 1) if t else 0
+            nice = "🥇 ORO" if symbol == "XAUUSD" else "₿ BITCOIN" if symbol == "BTCUSDT" else symbol
+            lines.append(f"{nice}: {s[chr(39)+chr(87)+chr(73)+chr(78)+chr(39)]}W / {s[chr(39)+chr(76)+chr(79)+chr(83)+chr(83)+chr(39)]}L ({swr}%)")
+        lines.append("")
+        lines.append("⚡ NEXUS APEX")
+        msg = chr(10).join(lines)
+        send_telegram(msg)
+        print("[WEEKLY REPORT] Enviado a Telegram")
+    except Exception as e:
+        print(f"[WEEKLY REPORT ERROR] {e}")
+
+_last_weekly_report_date = None
+
+def weekly_report_monitor():
+    global _last_weekly_report_date
+    while True:
+        try:
+            now = datetime.utcnow()
+            today_str = now.strftime("%Y-%m-%d")
+            if now.weekday() == 6 and now.hour == 18 and _last_weekly_report_date != today_str:
+                send_weekly_report()
+                _last_weekly_report_date = today_str
+        except Exception as e:
+            print(f"[WEEKLY REPORT MONITOR ERROR] {e}")
+        time.sleep(1800)
+
 def track_record_monitor():
     init_track_db()
     while True:
@@ -4075,6 +4132,7 @@ threading.Thread(target=bg_updater, daemon=True).start()
 threading.Thread(target=gold_freq_monitor, daemon=True).start()
 threading.Thread(target=btc_freq_monitor, daemon=True).start()
 threading.Thread(target=track_record_monitor, daemon=True).start()
+threading.Thread(target=weekly_report_monitor, daemon=True).start()
 threading.Thread(target=copy_trading_monitor, daemon=True).start()
 # threading.Thread(target=fast_signal_monitor, daemon=True).start()  # DESACTIVADO: redundante con gold_freq_monitor/btc_freq_monitor
 threading.Thread(target=scheduled_reports_monitor, daemon=True).start()
