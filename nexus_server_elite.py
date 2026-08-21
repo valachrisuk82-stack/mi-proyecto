@@ -1304,6 +1304,9 @@ def check_gold_frequent_signal():
         sl = price - sl_distance if signal == "BUY" else price + sl_distance
         tp = price + tp_distance if signal == "BUY" else price - tp_distance
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+        tp1 = price + sl_distance*1.0 if signal == "BUY" else price - sl_distance*1.0
+        tp2 = tp
+        tp3 = price + sl_distance*3.0 if signal == "BUY" else price - sl_distance*3.0
         if is_recent_duplicate_signal("XAUUSD", signal, price):
             print(f"[GOLD FREQ] Duplicado detectado, omitiendo envio")
             return
@@ -1314,7 +1317,9 @@ def check_gold_frequent_signal():
                f"💎 Activo: <b>ORO (XAUUSD)</b>\n"
                f"💰 Entrada: <b>${price:,.2f}</b>\n"
                f"🛑 Stop Loss: <b>${sl:,.2f}</b>\n"
-               f"🎯 Take Profit: <b>${tp:,.2f}</b>\n"
+               f"🎯 TP1 (1:1): <b>${tp1:,.2f}</b>\n"
+               f"🎯 TP2 (1:2): <b>${tp2:,.2f}</b>\n"
+               f"🎯 TP3 (1:3): <b>${tp3:,.2f}</b>\n"
                f"📐 R:R: <b>1:{rr}</b>\n"
                f"🤖 Confianza: <b>{confidence}%</b>\n"
                f"💬 {reason}\n"
@@ -1403,6 +1408,9 @@ def check_btc_frequent_signal():
         sl = price - sl_distance if signal == "BUY" else price + sl_distance
         tp = price + tp_distance if signal == "BUY" else price - tp_distance
         rr = round(abs(tp-price)/max(0.0001, abs(price-sl)), 1)
+        tp1 = price + sl_distance*1.0 if signal == "BUY" else price - sl_distance*1.0
+        tp2 = tp
+        tp3 = price + sl_distance*3.0 if signal == "BUY" else price - sl_distance*3.0
         if is_recent_duplicate_signal("BTCUSDT", signal, price):
             print(f"[BTC FREQ] Duplicado detectado, omitiendo envio")
             return
@@ -1414,7 +1422,9 @@ def check_btc_frequent_signal():
             f"💎 Activo: <b>BITCOIN (BTC)</b>",
             f"💰 Entrada: <b>${price:,.2f}</b>",
             f"🛑 Stop Loss: <b>${sl:,.2f}</b>",
-            f"🎯 Take Profit: <b>${tp:,.2f}</b>",
+            f"🎯 TP1 (1:1): <b>${tp1:,.2f}</b>",
+            f"🎯 TP2 (1:2): <b>${tp2:,.2f}</b>",
+            f"🎯 TP3 (1:3): <b>${tp3:,.2f}</b>",
             f"📐 R:R: <b>1:{rr}</b>",
             f"🤖 Confianza: <b>{confidence}%</b>",
             f"💬 {reason}",
