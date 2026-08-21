@@ -1390,7 +1390,9 @@ def check_btc_frequent_signal():
         if signal == "WAIT":
             return
         prev = _btc_freq_state.get("signal")
-        if prev == signal:
+        prev_time = _btc_freq_state.get("time")
+        cooldown_min = 30
+        if prev == signal and prev_time and (datetime.now() - prev_time).total_seconds() < cooldown_min * 60:
             return
         live_price = get_binance_live_price("BTCUSDT")
         if live_price:
