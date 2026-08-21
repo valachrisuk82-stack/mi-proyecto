@@ -3959,6 +3959,30 @@ def test_btc_freq():
     check_btc_frequent_signal()
     return jsonify({"ok": True, "state": _btc_freq_state})
 
+@app.route("/api/test_message_format")
+def test_message_format():
+    price = 4590.00
+    sl_distance = 6.85
+    tp1 = price + sl_distance*1.0
+    tp2 = price + sl_distance*2.0
+    tp3 = price + sl_distance*3.0
+    sl = price - sl_distance
+    msg = (f"🟢 <b>SEÑAL RÁPIDA — BUY</b> ⚠️ ESTO ES UNA PRUEBA\n"
+           f"━━━━━━━━━━━━━━━━━━━━\n"
+           f"💎 Activo: <b>ORO (XAUUSD)</b>\n"
+           f"💰 Entrada: <b>${price:,.2f}</b>\n"
+           f"🛑 Stop Loss: <b>${sl:,.2f}</b>\n"
+           f"🎯 TP1 (1:1): <b>${tp1:,.2f}</b>\n"
+           f"🎯 TP2 (1:2): <b>${tp2:,.2f}</b>\n"
+           f"🎯 TP3 (1:3): <b>${tp3:,.2f}</b>\n"
+           f"📐 R:R: <b>1:2.0</b>\n"
+           f"🤖 Confianza: <b>85%</b>\n"
+           f"💬 Este es un mensaje de PRUEBA del nuevo formato con 3 TPs\n"
+           f"🕐 {datetime.now().strftime(chr(37)+chr(72)+chr(58)+chr(37)+chr(77))} Londres (Twelve Data)\n"
+           f"⚡ NEXUS APEX")
+    send_telegram(msg)
+    return jsonify({"ok": True, "mensaje": "Prueba enviada a Telegram"})
+
 @app.route("/api/test_gold_freq")
 def test_gold_freq():
     check_gold_frequent_signal()
