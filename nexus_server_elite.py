@@ -941,7 +941,7 @@ def process_pair(pair):
         sig  = ml["signal"]
         conf = ml["confidence"]
         print(f"  ✓ {pair}: RSI={ind.get('rsi','?')} ML={ml['ml_score']} → {sig} ({conf}%)")
-        ALERT_PAIRS = ["BTCUSDT"]  # Solo BTC — resto va por reportes programados
+        ALERT_PAIRS = []  # DESACTIVADO: la Señal ML antigua se apagó, solo queda la Señal Rápida (EMA3+H1)
         if pair not in ALERT_PAIRS:
             return ml
         prev = cache["last_alerts"].get(pair,{}).get("signal")
