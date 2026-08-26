@@ -1372,9 +1372,9 @@ def check_btc_frequent_signal():
         close_last, close_prev = df_m1["close"].iloc[-1], df_m1["close"].iloc[-2]
         m1_cross_bull = close_prev <= m1_3p and close_last > m1_3
         m1_cross_bear = close_prev >= m1_3p and close_last < m1_3
-        # H1 tendencia RAPIDA (EMA5/13, validada por backtest: 50.8% vs 44.2% de EMA9/21)
-        h1_ema9 = ema(df_h1["close"], 5).iloc[-1]
-        h1_ema21 = ema(df_h1["close"], 13).iloc[-1]
+        # H1 tendencia MUY RAPIDA para BTC (EMA2/6, validada por backtest: 65.7% vs 47.0% de EMA5/13)
+        h1_ema9 = ema(df_h1["close"], 2).iloc[-1]
+        h1_ema21 = ema(df_h1["close"], 6).iloc[-1]
         h1_bull = h1_ema9 > h1_ema21
         h1_bear = h1_ema9 < h1_ema21
         rsi = calc_rsi(df_m1)
