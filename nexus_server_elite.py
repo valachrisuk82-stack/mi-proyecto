@@ -1229,6 +1229,8 @@ def check_gold_frequent_signal():
     try:
         df_m1 = get_twelvedata_gold_klines("1min", 60)
         df_h1 = get_twelvedata_gold_klines("1h", 60)
+        if not df_h1.empty:
+            df_h1 = df_h1.iloc[:-1].reset_index(drop=True)  # descartar hora en formacion
         if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
             print(f"[GOLD FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
@@ -1355,6 +1357,8 @@ def check_btc_frequent_signal():
     try:
         df_m1 = get_klines("BTCUSDT", "1m", 60)
         df_h1 = get_klines("BTCUSDT", "1h", 60)
+        if not df_h1.empty:
+            df_h1 = df_h1.iloc[:-1].reset_index(drop=True)  # descartar hora en formacion
         if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
             print(f"[BTC FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
