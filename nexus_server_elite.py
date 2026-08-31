@@ -1206,15 +1206,16 @@ def is_near_high_impact_news(buffer_minutes=30):
     return False, None
 
 def is_gold_market_open():
-    """Oro cierra viernes 22:00 UTC, reabre domingo 22:00 UTC"""
+    """Oro cierra viernes 22:00 UTC. Domingo completo bloqueado como pausa de seguridad
+    (datos de Twelve Data quedan inestables un par de horas tras la reapertura) - se opera desde el lunes 00:00 UTC"""
     now = datetime.utcnow()
-    weekday = now.weekday()  # 0=lunes ... 5=sabado, 6=domingo
+    weekday = now.weekday()
     hour = now.hour
-    if weekday == 5:  # sabado completo
+    if weekday == 5:
         return False
-    if weekday == 6 and hour < 22:  # domingo antes de las 22:00 UTC
+    if weekday == 6:
         return False
-    if weekday == 4 and hour >= 22:  # viernes despues de las 22:00 UTC
+    if weekday == 4 and hour >= 22:
         return False
     return True
 
