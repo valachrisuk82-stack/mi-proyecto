@@ -4160,9 +4160,10 @@ def track_record_monitor():
 
 @app.route("/api/track_record")
 def api_track_record():
+    limit = min(int(request.args.get("limit", 100)), 5000)
     conn = sqlite3.connect(TRACK_DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status, closed_time, closed_price FROM signals ORDER BY id DESC LIMIT 100")
+    c.execute("SELECT symbol, signal_type, direction, entry_price, sl, tp, confidence, sent_time, status, closed_time, closed_price FROM signals ORDER BY id DESC LIMIT ?", (limit,))
     rows = c.fetchall()
     conn.close()
     cols = ["symbol","signal_type","direction","entry_price","sl","tp","confidence","sent_time","status","closed_time","closed_price"]
