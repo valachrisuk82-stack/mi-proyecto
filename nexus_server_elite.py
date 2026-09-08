@@ -1399,10 +1399,11 @@ def check_btc_frequent_signal():
         print(f"[BTC FREQ] sig={signal} conf={confidence} rsi={rsi:.2f} adx={adx:.1f} reason={reason}")
         if signal == "WAIT":
             return
+        # Sin cooldown de tiempo - validado por backtest: 61.3% (sin limite) vs 38.7% (30 min)
+        # BTC con EMA2/6 genera muchos cruces dentro de la misma tendencia; repetir cada 30 min
+        # capturaba entradas tardias de baja calidad. Bloquear hasta reversion da la mejor calidad.
         prev = _btc_freq_state.get("signal")
-        prev_time = _btc_freq_state.get("time")
-        cooldown_min = 30
-        if prev == signal and prev_time and (datetime.now() - prev_time).total_seconds() < cooldown_min * 60:
+        if prev == signal:
             return
         live_price = get_binance_live_price("BTCUSDT")
         if live_price:
