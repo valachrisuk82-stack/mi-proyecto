@@ -1291,10 +1291,11 @@ def check_gold_frequent_signal():
 
         if signal == "WAIT":
             return
+        # Sin cooldown de tiempo - validado por backtest: 70.7% (+1.121R) sin limite vs 31.4% (-0.058R) con 30 min
+        # El cooldown de 30 min generaba entradas tardias repetidas dentro de la misma tendencia,
+        # diluyendo la calidad. Bloquear hasta reversion da la mejor expectativa real.
         prev = _gold_freq_state.get("signal")
-        prev_time = _gold_freq_state.get("time")
-        cooldown_min = 30
-        if prev == signal and prev_time and (datetime.now() - prev_time).total_seconds() < cooldown_min * 60:
+        if prev == signal:
             return
 
         # Usar precio EN VIVO para la entrada (no el cierre de una vela ya pasada)
