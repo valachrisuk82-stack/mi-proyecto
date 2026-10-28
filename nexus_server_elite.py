@@ -1215,6 +1215,8 @@ def is_gold_market_open():
         return False
     if weekday == 6:
         return False
+    if weekday == 0 and hour < 2:
+        return False
     if weekday == 4 and hour >= 22:
         return False
     return True
