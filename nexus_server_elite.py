@@ -1407,9 +1407,10 @@ def check_btc_frequent_signal():
         prev = _btc_freq_state.get("signal")
         if prev == signal:
             return
-        live_price = get_binance_live_price("BTCUSDT")
-        if live_price:
-            price = live_price
+        # Entry = cierre de la vela M1 que genero la senal (igual que el backtest,
+        # que siempre uso el cierre de vela como entry; pedir un precio "en vivo"
+        # aqui introducia slippage sistematico no modelado en el backtest -- mismo
+        # bug encontrado y corregido en la senal de oro).
         # SL/TP con minimo de distancia (0.15% del precio) para evitar stops demasiado ajustados
         sl_distance = max(atr*2.0, price*0.0015)
         tp_distance = sl_distance * 2.0
