@@ -1300,10 +1300,9 @@ def check_gold_frequent_signal():
         if prev == signal:
             return
 
-        # Usar precio EN VIVO para la entrada (no el cierre de una vela ya pasada)
-        live_price = get_twelvedata_live_price()
-        if live_price:
-            price = live_price
+        # Entry = cierre de la vela M1 que genero la senal (igual que el backtest,
+        # que siempre uso row["close"] como entry; pedir un precio "en vivo" aqui
+        # introducia slippage sistematico no modelado en el backtest).
         # SL/TP con minimo de distancia (0.15% del precio) para evitar stops demasiado ajustados
         sl_distance = max(atr*2.0, price*0.0020)  # validado por backtest: 70.4% vs 64.8% con 0.15%
         tp_distance = sl_distance * 2.0
