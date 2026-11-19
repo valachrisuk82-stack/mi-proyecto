@@ -1215,8 +1215,9 @@ def is_gold_market_open():
         return False
     if weekday == 6:
         return False
-    if weekday == 0 and hour < 2:
-        return False
+    # Bloqueo fijo de 2h el lunes ELIMINADO: el filtro de velas congeladas
+    # en check_gold_frequent_signal() ya resuelve la causa raiz (ADX inflado
+    # tras el cierre de fin de semana) de forma mas precisa que un horario fijo.
     if weekday == 4 and hour >= 22:
         return False
     return True
@@ -1234,6 +1235,12 @@ def check_gold_frequent_signal():
         df_h1 = get_twelvedata_gold_klines("1h", 60)
         if not df_h1.empty:
             df_h1 = df_h1.iloc[:-1].reset_index(drop=True)  # descartar hora en formacion
+            # Descartar velas "congeladas" (mercado cerrado -- fin de semana):
+            # rango high-low casi nulo distorsiona ATR/ADX y genera falsos ADX
+            # altos al reabrir el lunes (confirmado por backtest: 194/210 horas
+            # de lunes madrugada con ADX inflado >= 25 vs el valor real filtrado).
+            h1_range_pct = (df_h1["high"] - df_h1["low"]) / df_h1["close"]
+            df_h1 = df_h1[h1_range_pct > 0.0001].reset_index(drop=True)
         if df_m1.empty or len(df_m1) < 22 or df_h1.empty or len(df_h1) < 22:
             print(f"[GOLD FREQ] Sin datos suficientes M1={len(df_m1)} H1={len(df_h1)}")
             return
